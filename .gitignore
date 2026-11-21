@@ -333,3 +333,8 @@ local.properties
 .gradle/
 .idea/
 *.apk
+/emulator/**/*.iml
+/emulator/**/.DS_Store
+/emulator/captures/
+/emulator/**/.externalNativeBuild/
+/emulator/**/.cxx/
