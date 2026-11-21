@@ -31,7 +31,6 @@ MANIFEST
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
-.env
 
 # Installer logs
 pip-log.txt
@@ -223,28 +222,114 @@ __marimo__/
 # Streamlit
 .streamlit/secrets.toml
 
-# --- Earshot ---
-# secrets
-.env
+# Unity simulator generated files
+# Based on https://github.com/github/gitignore/blob/main/Unity.gitignore
+/simulation/**/.utmp/
+/simulation/[Ll]ibrary/
+/simulation/[Tt]emp/
+/simulation/[Oo]bj/
+/simulation/[Bb]uild/
+/simulation/[Bb]uilds/
+/simulation/[Ll]ogs/
+/simulation/[Uu]ser[Ss]ettings/
+/simulation/[Mm]emory[Cc]aptures/
+/simulation/[Rr]ecordings/
+
+# Editor and IDE files
+/simulation/[Aa]ssets/Plugins/Editor/JetBrains*
+/simulation/**/*.DotSettings.user
+/simulation/**/.vs/
+/simulation/**/.gradle/
+/simulation/**/ExportedObj/
+/simulation/**/.consulo/
+/simulation/**/*.csproj
+/simulation/**/*.unityproj
+/simulation/**/*.sln
+/simulation/**/*.slnx
+/simulation/**/*.suo
+/simulation/**/*.tmp
+/simulation/**/*.user
+/simulation/**/*.userprefs
+/simulation/**/*.pidb
+/simulation/**/*.booproj
+/simulation/**/*.svd
+/simulation/**/*.pdb
+/simulation/**/*.mdb
+/simulation/**/*.opendb
+/simulation/**/*.VC.db
+/simulation/**/.vsconfig
+/simulation/**/*.pidb.meta
+/simulation/**/*.pdb.meta
+/simulation/**/*.mdb.meta
+
+# Crash reports and build outputs
+/simulation/**/sysinfo.txt
+/simulation/**/.dirstamp
+/simulation/**/mono_crash.*
+/simulation/**/tmpinst-dir.stamp
+/simulation/*_BackUpThisFolder_ButDontShipItWithYourGame/
+/simulation/*_BurstDebugInformation_DoNotShip/
+/simulation/**/*.apk
+/simulation/**/*.aab
+/simulation/**/*.obb
+/simulation/**/*.unitypackage
+/simulation/**/*.unitypackage.meta
+/simulation/**/*.app
+/simulation/**/crashlytics-build.properties
+
+# Asset import caches and recovery files
+/simulation/[Aa]ssets/**/*.blend1
+/simulation/[Aa]ssets/**/*.blend1.meta
+/simulation/[Aa]ssets/**/TDImportCache/
+/simulation/[Aa]ssets/**/TDImportCache.meta
+/simulation/[Aa]ssets/_Recovery/
+/simulation/[Aa]ssets/_Recovery.meta
+/simulation/[Aa]ssets/[Ss]ceneDependencyCache*
+/simulation/UIElementsSchema/
+
+# Addressables generated output
+/simulation/[Aa]ssets/AddressableAssetsData/*/addressables_content_state.bin
+/simulation/[Aa]ssets/AddressableAssetsData/*/addressables_content_state.bin.meta
+/simulation/[Aa]ssets/AddressableAssetsData/link.xml
+/simulation/[Aa]ssets/AddressableAssetsData/link.xml.meta
+/simulation/[Aa]ssets/Addressables_Temp/
+/simulation/[Aa]ssets/Addressables_Temp.meta
+/simulation/[Aa]ssets/StreamingAssets/aa/
+/simulation/[Aa]ssets/StreamingAssets/aa.meta
+/simulation/ServerData/
+
+# Android dependency resolver and local Gradle settings
+/simulation/[Aa]ssets/GeneratedLocalRepo/
+/simulation/[Aa]ssets/GeneratedLocalRepo.meta
+/simulation/[Aa]ssets/Plugins/Android/**/*.gradle.backup*
+/simulation/[Aa]ssets/Plugins/Android/**/local.properties
+
+# Unity Test Framework and Visual Scripting generated assets
+/simulation/[Aa]ssets/Resources/PerformanceTestRunInfo.json
+/simulation/[Aa]ssets/Resources/PerformanceTestRunInfo.json.meta
+/simulation/[Aa]ssets/Resources/PerformanceTestRunSettings.json
+/simulation/[Aa]ssets/Resources/PerformanceTestRunSettings.json.meta
+/simulation/[Aa]ssets/InitTestScene*.unity
+/simulation/[Aa]ssets/InitTestScene*.unity.meta
+/simulation/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers/
+/simulation/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Core/Property Providers.meta
+/simulation/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db
+/simulation/[Aa]ssets/Unity.VisualScripting.Generated/VisualScripting.Flow/UnitOptions.db.meta
+
+
+# Earshot local secrets and generated data
 .env.*
 !.env.example
 local.properties
-# ML data, models and caches (rebuilt by ml/scripts, shared out of band)
-ml/data/
-ml/demo_pack/
-ml/results/cache/
+/ml/data/
+/ml/demo_pack/
+/ml/results/
+/shared/scenarios/train/
+/shared/scenarios/tune/
+/shared/scenarios/test/
 *.zip
-# Android / Unity (teammates' folders)
+
+# Android and IDE output
 .gradle/
 .idea/
 *.apk
-unity/[Ll]ibrary/
-unity/[Tt]emp/
-unity/[Oo]bj/
-unity/[Ll]ogs/
-unity/[Uu]ser[Ss]ettings/
-# generated evaluation rides and raw results (rebuilt by ml/scripts; demo scenarios stay in git)
-shared/scenarios/train/
-shared/scenarios/tune/
-shared/scenarios/test/
-ml/results/
