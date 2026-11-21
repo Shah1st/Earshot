@@ -150,6 +150,44 @@ These five rides were written after the system existed and the prompt was adjust
 show the intended behaviour, not an independent test. One aggressor line in ride 3 uses the fallback TTS voice
 because the speech model refused it.
 
+### 4.4 Ablation: what each part contributes, and how fitted it is (`ml/scripts/ablation.py`, config v11)
+
+Same rides, same judge model and prompt. "Opened" = an event reached the judge. Test split, 16 incidents:
+
+| Variant | Opened | Alerted | False alerts / h | Tokens / h | vs audio LLM (126,662) |
+|---|---|---|---|---|---|
+| Full | 13 / 16 | 11 / 16 | 14.0 | 40,524 | 3.1x fewer |
+| No keyword trigger (Vosk transcript still given to the judge) | 12 / 16 | 9 / 16 | 3.0 | 21,270 | 6.0x fewer |
+| No Vosk at all (judge sees sound labels + GPS only) | 11 / 16 | 5 / 16 | 1.5 | 18,178 | 7.0x fewer |
+| No Vosk, raw YAMNet classes instead of our head | 5 / 16 | 2 / 16 | 0.0 | 7,014 | 18x fewer |
+
+* **Trigger words** add 2 incidents on test and cause most of the false alerts and half of the tokens (the radio drama
+  decoy). They are a recall/cost dial, not the core of the system.
+* **The transcript given to the judge is the core:** without it alerts drop from 9 to 5 of 16, and GPS anomalies can
+  only produce blind check-ins.
+* **Fitted to tuning data:** with the head alone (no Vosk) an event opens for 18 / 20 incidents on tune but 11 / 16 on
+  test (90% vs 69%). On incidents with an acted dialogue: 11 / 12 on tune, 8 / 12 on test. The head partly learned
+  the tune dialogues.
+* **Real recorded sounds only (Freesound screams, glass), full system:** opened 7 / 8 on tune and 4 / 4 on test, but
+  alerted only 1 / 8 and 2 / 4. The head hears real screams; the text judge then dismisses them because there are
+  no words and YAMNet labels them "Animal" or "Siren". This is the main weakness to fix (a rule: very confident
+  sound with no speech is at least a check-in).
+* Small numbers: the real sound group is 4 incidents on test.
+
+Demo rides (216 s in total, measured):
+
+| Variant | Ride 1 forced stop | Ride 2 road works | Ride 3 shouting + detour | Ride 4 normal | Ride 5 engine stall | Tokens |
+|---|---|---|---|---|---|---|
+| Audio LLM (11 chunks) | alert | dismiss | alert | dismiss | check-in, then dismiss | 7,705 |
+| Full | alert 21.5 s | dismiss | alert 24 s | nothing | dismiss | 3,405 |
+| No keyword trigger | alert 29 s | dismiss | alert 38.5 s | nothing | dismiss | 2,760 |
+| No Vosk | **dismiss (missed)** | blind check-in | blind check-in | nothing | blind check-in | 616 |
+| Raw YAMNet, no Vosk | **nothing (missed)** | blind check-in | blind check-in | nothing | blind check-in | 0 |
+
+Without the keyword trigger both demo threats are still caught, 7.5 and 14.5 s later (through the sound head and the
+GPS anomaly). Without Vosk the system cannot tell the road works detour from the hijack. On these short, event
+packed rides the token saving against the audio LLM is 2.3x.
+
 ## 5. Findings worth telling
 
 * **Native YAMNet classes are not enough in a car.** With the plan's groups and thresholds almost nothing fires
