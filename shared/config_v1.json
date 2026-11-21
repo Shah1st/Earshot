@@ -1,5 +1,5 @@
 {
-  "version": 8,
+  "version": 9,
   "audio": {
     "sr": 16000,
     "model": "yamnet_tfhub.tflite",
@@ -102,7 +102,8 @@
     ],
     "continuous": true,
     "context_s": 45,
-    "gps_context_s": 120
+    "gps_context_s": 120,
+    "keyword_trigger": false
   },
   "judge": {
     "model": "google/gemini-3.1-flash-lite",
