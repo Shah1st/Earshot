@@ -1,5 +1,5 @@
 {
-  "version": 11,
+  "version": 12,
   "audio": {
     "sr": 16000,
     "model": "yamnet_tfhub.tflite",
@@ -125,5 +125,21 @@
   },
   "head": {
     "file": "head.json"
+  },
+  "wordless_rule": {
+    "enabled": true,
+    "max_words": 2,
+    "benign_labels": [
+      "Laughter",
+      "Giggle",
+      "Snicker",
+      "Chuckle, chortle",
+      "Belly laugh",
+      "Baby laughter",
+      "Cough",
+      "Throat clearing",
+      "Sneeze"
+    ],
+    "benign_min_score": 0.2
   }
 }

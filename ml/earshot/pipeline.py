@@ -10,8 +10,9 @@ Three things can open an event (all on device, 0 tokens):
   "keyword"  continuous Vosk hears a safety phrase ("stop the car", "let me out", ...), even spoken calmly
   "gps"      a GPS anomaly starts (left the route, sudden stop, long stop) with no sound event around it
 An event is sealed 5 s after it opens and sent to the LLM judge as a short text summary: sound labels,
-GPS context, the rolling transcript, earlier decisions of this ride. One exception needs no LLM decision:
-a very confident sound together with a GPS anomaly alerts immediately (the LLM only writes the summary).
+GPS context, the rolling transcript, earlier decisions of this ride. Two cases need no LLM decision:
+  * a very confident sound together with a GPS anomaly alerts immediately (the LLM only writes the summary);
+  * a sound event with no speech around it is decided by a rule (config "wordless_rule"): check in with the rider.
 """
 from __future__ import annotations
 
@@ -128,6 +129,21 @@ class RidePipeline:
             payload.update(keywords=list(find_keywords(text, a["keywords"])), transcript=text)
         else:
             payload.update(keywords=[], transcript="")
+        rule = self.cfg.get("wordless_rule", {})
+        if rule.get("enabled") and ev["trigger"] == "sound" and self.asr is not None:
+            # A loud sound with no words around it: a text judge has nothing to read (and measured, an audio LLM
+            # dismisses most wordless screams too). So no LLM call: ask the rider, unless YAMNet also hears
+            # laughter or coughing in it. With a GPS anomaly on top it is an alert.
+            words = len(self.asr.transcript(ev["t0"] - 5, now).split())
+            if words <= rule["max_words"]:
+                benign = max(float(ev["class_max"][self.det.labels.index(c)]) for c in rule["benign_labels"])
+                if self.merged_alerted:
+                    return self._emit(now, "alert", "rule+summary", 3, "loud sound, no speech", payload, None, ev["id"], "summary")
+                if benign >= rule["benign_min_score"]:
+                    return self._emit(now, "dismiss", "rule", 1, "loud sound with laughter or cough labels, no speech", payload, None, ev["id"])
+                if self.gps.state["anomaly"]:
+                    return self._emit(now, "alert", "rule", 3, "loud sound with no speech during a GPS anomaly", payload, None, ev["id"])
+                return self._emit(now, "check_in", "rule", 2, "loud sound with no speech", payload, None, ev["id"])
         earlier = [o for o in self.outputs if o["type"] == "decision"][-3:]
         if earlier:
             payload["earlier"] = [{"t": o["t"], "decision": o["decision"], "reason": o["reason"]} for o in earlier]
