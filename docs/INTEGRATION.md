@@ -68,7 +68,7 @@ metres, so convert world metres to degrees around any origin:
 * One `KaldiRecognizer(model, 16000)` with `setWords(true)`, fed every chunk for the whole ride.
 * When `acceptWaveForm` returns true, read `result`: keep words with `conf ≥ asr.min_word_conf` as
   `(word, start, end)` in a rolling list (text only, in memory). Otherwise read `partialResult`.
-* **Keyword trigger:** look for the phrases of `asr.keywords` as whole word sequences in the current utterance
+* **Keyword trigger (`asr.keyword_trigger`, currently `false`):** when enabled, look for the phrases of `asr.keywords` as whole word sequences in the current utterance
   (partial or final), longest phrase first; fire when a phrase appears that was not already counted in this utterance.
 * Transcript for the judge = kept words whose time falls in the last `asr.context_s` (45 s), or
   `asr.gps_context_s` (120 s) for GPS events, plus the current partial text.
@@ -91,7 +91,7 @@ An event **opens** when no event is open, the last trigger was ≥ `event.cooldo
 | Trigger | Condition |
 |---|---|
 | `sound` | sound trigger fires (2.2) |
-| `keyword` | keyword trigger fires (2.3) |
+| `keyword` | keyword trigger fires (2.3); only when `asr.keyword_trigger` is true (off by default) |
 | `gps: <flag text>` | a GPS flag turns on (2.4) |
 
 Any sound or keyword trigger refreshes the cooldown timer (so a long scream is one event).

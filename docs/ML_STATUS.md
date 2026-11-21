@@ -29,7 +29,10 @@ is in `docs/INTEGRATION.md`.
    is the default. The MediaPipe `yamnet.tflite` has no embedding output, so the app must use the float model with
    the LiteRT interpreter (16 MB instead of 4 MB).
 2. **Speech:** Vosk small model runs **continuously** on device and keeps a rolling transcript as text.
-   A safety phrase in it opens an event (`keyword` trigger).
+   A safety phrase in it can open an event (`keyword` trigger), but this is **switched off by default**
+   (`asr.keyword_trigger: false`, since config v12) after the ablation in 4.4: it added 2 of 16 incidents for
+   most of the false alerts and half of the tokens. The transcript is still given to the judge for every event.
+   Consequence: a calmly spoken threat with no loud sound and no GPS anomaly is not examined at all.
    *Changed:* the plan transcribed only the clip around a sound event. That cannot catch a calm threat
    ("stop the car and get out") or explain a detour, which the team's demo cases need. Cost: more CPU on the phone,
    still 0 tokens. The plan's grammar limited keyword pass was dropped (it hallucinates, see 5).
@@ -135,9 +138,9 @@ which is why false alerts look so much better here than on test.
 
 | Ride | What happens | System output |
 |---|---|---|
-| `demo_1_forced_stop` (38 s) | passenger rudely orders the driver to stop and get out; car stops, noise drops to idle | **alert** at 21.5 s (keyword "stop the car") |
+| `demo_1_forced_stop` (38 s) | passenger rudely orders the driver to stop and get out; car stops, noise drops to idle | **alert** at 29 s (21.5 s with the keyword trigger on) |
 | `demo_2_roadworks` (46 s) | driver announces a road works detour, leaves the route, comes back | **dismiss** at 31 s ("driver explained the route change") |
-| `demo_3_shouting_detour` (42 s) | passenger shouts orders, car turns off the route | **alert** at 24 s, again at 38.5 s when the route is left |
+| `demo_3_shouting_detour` (42 s) | passenger shouts orders, car turns off the route | **alert** at 38.5 s, when the route is left (24 s with the keyword trigger on) |
 | `demo_4_normal` (33 s) | ordinary chat on route | nothing, 0 tokens |
 | `demo_5_engine_stall` (57 s) | engine cuts out (cabin goes quiet), driver explains, long stop | **dismiss** at 53.5 s ("minor mechanical issue") |
 
