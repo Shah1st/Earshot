@@ -248,3 +248,4 @@ shared/scenarios/train/
 shared/scenarios/tune/
 shared/scenarios/test/
 ml/results/
+shared/scenarios/sound_*/
