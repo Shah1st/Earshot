@@ -191,6 +191,32 @@ Without the keyword trigger both demo threats are still caught, 7.5 and 14.5 s l
 GPS anomaly). Without Vosk the system cannot tell the road works detour from the hijack. On these short, event
 packed rides the token saving against the audio LLM is 2.3x.
 
+### 4.5 Wordless sounds: text judge vs audio judge vs rule (`ml/scripts/compare_sound_paths.py`, config v12)
+
+Focused rides: real driving noise and one isolated real sound every ~20 s, no dialogues. Real threats = every
+Freesound scream and breaking glass clip of the split; harmless = laughter, coughs, doors, horns, short neutral
+speech. For each event the sound head opened, three ways of deciding were recorded on the same event.
+Test split (0.66 h, 29 real threats, 84 harmless sounds); the sound head opened 19 of the 29 threats and 7 of the
+84 harmless sounds.
+
+| Path | Threats alerted | Threats checked in | Threats dismissed | Harmless alerted | Harmless checked in | Tokens / event |
+|---|---|---|---|---|---|---|
+| A. Text judge (labels + GPS + transcript) | 5 | 4 | 10 | 2 | 0 | 692 |
+| B. Audio judge (10 s clip sent to the audio LLM) | 7 | 0 | 12 | 0 | 0 | 444 |
+| C. Rule: check in unless the top label is laughter or cough like | 0 | 19 | 0 | 0 | 6 | 0 |
+
+Tune split (1.25 h, 57 threats, 156 harmless): head opened 25 and 10; A: 2 alerts + 2 check-ins of 25; B: 6 alerts
+of 25; C: 25 check-ins, 10 harmless check-ins.
+
+* Sending the audio does not rescue wordless screams: the audio LLM dismisses most of them too. Its perfect
+  score in 4.1 came from incidents with spoken words.
+* Only the rule never drops a detected scream, at 0 tokens and with no audio leaving the phone. Its price is a
+  check-in on about 7% of loud harmless sounds (6 of 84), and the label exclusion barely helps (it removed 1).
+* The sound head itself misses a third of isolated real screams and glass on test (19 / 29) and more than half on
+  tune (25 / 57) at the current threshold, which was set to limit LLM calls.
+* Caveat: the Freesound "scream" clips were not checked by ear; some may be playful, so part of the LLM's
+  dismissals may be reasonable.
+
 ## 5. Findings worth telling
 
 * **Native YAMNet classes are not enough in a car.** With the plan's groups and thresholds almost nothing fires
