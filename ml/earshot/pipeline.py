@@ -82,6 +82,8 @@ class RidePipeline:
         self.prev_emb = emb
         fired, _ = self.triggers.step(gs)
         heard = self.asr.feed(now, chunk) if self.asr is not None else []
+        if not self.cfg["asr"].get("keyword_trigger", True):
+            heard = []  # ablation: Vosk still transcribes for the judge, but a phrase cannot open an event
         groups = self.cfg["groups"]
         new = []
 
