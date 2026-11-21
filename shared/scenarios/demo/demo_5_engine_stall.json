@@ -1,0 +1,47 @@
+{
+ "id": "demo_5_engine_stall",
+ "split": "demo",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 57,
+ "expected_outcome": "dismiss",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true,
+   "idle_clip": "cabin/drive_000kph_mic14.wav",
+   "idle_gain_db": -30
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "demo/demo_5_engine_stall_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 5.19,
+   "text": "P: Hi. To the airport, please. No rush, my flight is in three hours."
+  },
+  {
+   "t": 9.2,
+   "clip": "demo/demo_5_engine_stall_part2.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 18.61,
+   "text": "D: Uh oh. Hmm. That's not good. The engine just cut out. P: Oh. Is everything okay? D: Yeah, yeah, nothing dangerous. Sorry about this. Give me a couple of minutes, I need to check what the problem is. P: Sure, take your time. I'm not in a hurry."
+  },
+  {
+   "t": 10.2,
+   "gps": "stop"
+  },
+  {
+   "t": 39.8,
+   "clip": "demo/demo_5_engine_stall_part3.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 7.95,
+   "text": "D: Okay, I think it's just the battery cable. One more minute and we can go. P: No worries at all."
+  }
+ ]
+}

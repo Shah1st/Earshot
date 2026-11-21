@@ -1,0 +1,33 @@
+{
+ "id": "demo_4_normal",
+ "split": "demo",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 33,
+ "expected_outcome": "nothing",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "demo/demo_4_normal_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 13.4,
+   "text": "P: Morning. Could you take me to the university, the main entrance? D: Of course. Nice day for it, finally some sun. P: Yeah, after two weeks of rain. I almost forgot what it looks like."
+  },
+  {
+   "t": 17.4,
+   "clip": "demo/demo_4_normal_part2.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 13.59,
+   "text": "D: Are you a student there, or do you work at the university? P: I teach, actually. First lecture at nine, and I haven't finished my slides. D: Ha. Then I'll drive carefully, so you can work in the back."
+  }
+ ]
+}
