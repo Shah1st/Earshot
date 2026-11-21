@@ -103,6 +103,18 @@ one line summary.
 While open, track per group the max score, per class the max score. The event **seals** `audio.clip_post_s` (5 s)
 after it opened and is sent to the judge.
 
+**Wordless sound, no LLM call (`config.wordless_rule`):** when a `sound` event seals and the transcript from
+5 s before it opened until now has at most `max_words` (2) words:
+
+| Condition, checked in this order | Output |
+|---|---|
+| the clear case alert was already sent for this event | summary "loud sound, no speech" (no LLM) |
+| max score of any `benign_labels` class during the event ≥ `benign_min_score` (0.2) | `dismiss` |
+| GPS `anomaly` is true | `alert` |
+| otherwise | `check_in` |
+
+Source is `rule`. All other events go to the judge.
+
 ### 2.6 Judge call (the only thing that costs tokens)
 
 `POST https://openrouter.ai/api/v1/chat/completions`, model `judge.model`, `temperature 0`, `max_tokens 80`,

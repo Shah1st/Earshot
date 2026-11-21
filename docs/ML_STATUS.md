@@ -41,6 +41,9 @@ is in `docs/INTEGRATION.md`.
    "road works, I'll go around" is dismissed.
 4. **Judge:** one text call to `google/gemini-3.1-flash-lite` per event (sound labels, GPS, transcript, earlier
    decisions) → dismiss / check_in / alert. Very confident sound + GPS anomaly alerts at once without waiting.
+   **Wordless sounds skip the LLM** (`wordless_rule`): a sound event with at most 2 words around it becomes a
+   rider check-in (alert if a GPS anomaly is active, dismissed if YAMNet also hears laughter or coughing).
+   Measured in 4.5: neither a text judge nor an audio LLM handles wordless screams.
 5. **Privacy wording to use:** audio never leaves the phone and only a 30 s rolling audio buffer exists; a rolling
    text transcript of at most 2 minutes is kept in memory; the LLM only ever receives a short text summary of an
    event. A normal quiet ride sends nothing.
@@ -96,6 +99,25 @@ so these are scripted and acted. This must be said when the numbers are presente
 Config version 8 for v2 (`shared/config.json`), same prompt and triggers for v1 (`shared/config_v1.json`).
 All token and cost figures are the `usage` values returned by OpenRouter. Raw outputs: `ml/results/*.json`
 (git ignored; rebuild with `evaluate.py` and `baseline_audio_llm.py`, LLM replies are cached).
+
+### 4.0 Current system (config v13: keyword trigger off, wordless sound rule on)
+
+Test split, 24 rides, 2.0 ride hours, 16 incidents:
+
+| System | Alerted | Alerted or rider check-in | False alerts / h | False check-ins / h | LLM calls / h | Tokens / h |
+|---|---|---|---|---|---|---|
+| Audio LLM hears everything | 16 / 16 | 16 / 16 | 16.5 | 0.5 | 144 | 126,662 |
+| **Ours, current** | 9 / 16 | 12 / 16 | 2.0 | 7.5 | 19.5 | 14,159 |
+
+* About 9 times fewer tokens than the audio LLM on these busy rides, no audio uploaded, 6 of 24 rides cost 0 tokens.
+* Incidents with a spoken threat: 8 / 12 alerted. Incidents made only of real recorded sounds: 4 / 4 surfaced
+  (1 alert, 3 check-ins); before the rule the text judge dismissed most of these.
+* The price of the rule is check-ins on harmless loud sounds: 7.5 per ride hour here, where a sound occurs every
+  8 to 20 s.
+* Tune split for comparison: 12 / 20 alerted, 18 / 20 alerted or checked in, 1.0 false alerts / h, 5.0 false
+  check-ins / h, 12,306 tokens / h.
+
+Sections 4.1 to 4.5 are the earlier configurations and the experiments that led here.
 
 ### 4.1 Test split (24 rides, 2.0 ride hours, 16 incidents, never used for tuning)
 
@@ -216,6 +238,37 @@ of 25; C: 25 check-ins, 10 harmless check-ins.
   tune (25 / 57) at the current threshold, which was set to limit LLM calls.
 * Caveat: the Freesound "scream" clips were not checked by ear; some may be playful, so part of the LLM's
   dismissals may be reasonable.
+
+### 4.6 Why YAMNet's own labels are weak here, and whether to train more (`ml/scripts/research_sound.py`)
+
+Same real clips (test split), share where YAMNet's best distress class reaches 0.3:
+
+| Condition | Scream | Glass |
+|---|---|---|
+| as recorded | 60% | 100% |
+| with car impulse response | 73% | 75% |
+| car + driving noise | 33% | 75% |
+| car + driving noise, 250 Hz high pass | 40% | 69% |
+
+The gap is the driving noise (the "Vehicle" score rises from 0.05 to 0.46), not the cabin acoustics, and a rumble
+filter does not remove it. 40% of Freesound "screams" do not reach 0.3 even clean.
+
+Detectors, thresholds set on tune rides:
+
+| Detector | Isolated real sounds (test): threats / harmless opened | Main test: acted dialogue incidents opened | Real sound incidents | False opens / h |
+|---|---|---|---|---|
+| YAMNet distress classes | 62% / 7% | 4 / 12 | 1 / 4 | 9 |
+| Current head | 83% / 13% | 11 / 12 | 3 / 4 | 31 |
+| Head trained only on real recordings + noise augmentation | 69% / 21% | 11 / 12 | 4 / 4 | 82 |
+
+* On real screams and glass the native classes are about as good as the head at the same harmless rate. The head's
+  gain is shouted speech, which YAMNet labels "Speech".
+* A head trained only on real recordings is not better (more false opens), so more training is not the lever.
+  It was not kept. It never heard an acted voice and still opens 11 / 12 acted dialogue incidents.
+* A laughter or cough label scoring ≥ 0.2 appears in 0% of opened threats and 11 to 22% of opened harmless sounds;
+  the rule uses this to skip the check-in.
+* Not tried: native classes and the head as two triggers together; features from an earlier YAMNet layer (the
+  shipped model only exposes the final embedding).
 
 ## 5. Findings worth telling
 
