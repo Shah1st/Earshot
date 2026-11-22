@@ -1,0 +1,89 @@
+[
+ {
+  "t": 24.0,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Aggressive verbal commands and threats indicate a potential threat to safety.",
+  "event_id": 1,
+  "event": {
+   "t": 19.0,
+   "trigger": "keyword",
+   "groups": {
+    "loud_event": 0.87
+   },
+   "duration_s": 0.0,
+   "top_labels": {
+    "Speech": 0.99
+   },
+   "gps": {
+    "speed_kmh": 50.0,
+    "off_route_m": 77,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "do what i say",
+    "shut up"
+   ],
+   "transcript": "could you go a little faster i'm late sweden are you deaf i said drive faster loot don't show shut up and turn your turn right now do what i say okay okay i'm turning"
+  },
+  "usage": {
+   "prompt_tokens": 627,
+   "completion_tokens": 30,
+   "total_tokens": 657,
+   "cost": 0.00020175,
+   "audio_tokens": 0
+  }
+ },
+ {
+  "t": 38.5,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Continued aggressive commands and threats confirm an ongoing safety threat.",
+  "event_id": 2,
+  "event": {
+   "t": 33.5,
+   "trigger": "gps: left the planned route",
+   "groups": {
+    "loud_event": 0.77
+   },
+   "duration_s": 0.0,
+   "top_labels": {
+    "Vehicle": 0.54,
+    "Bee, wasp, etc.": 0.47,
+    "Insect": 0.45,
+    "Fly, housefly": 0.42,
+    "Bicycle": 0.21
+   },
+   "gps": {
+    "speed_kmh": 49.8,
+    "off_route_m": 281,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "do what i say",
+    "shut up"
+   ],
+   "transcript": "could you go a little faster i'm late sweden are you deaf i said drive faster loot don't show shut up and turn your turn right now do what i say okay okay i'm turning please",
+   "earlier": [
+    {
+     "t": 24.0,
+     "decision": "alert",
+     "reason": "Aggressive verbal commands and threats indicate a potential threat to safety."
+    }
+   ]
+  },
+  "usage": {
+   "prompt_tokens": 701,
+   "completion_tokens": 36,
+   "total_tokens": 737,
+   "cost": 0.00022925,
+   "audio_tokens": 0
+  }
+ }
+]

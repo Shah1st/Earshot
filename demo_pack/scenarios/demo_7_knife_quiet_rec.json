@@ -1,0 +1,38 @@
+{
+ "id": "demo_7_knife_quiet_rec",
+ "split": "demo_recorded",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 31,
+ "expected_outcome": "alert",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "recorded/demo_7_knife_quiet_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 4.53,
+   "text": "P: Evening. Just drive towards the station. D: Sure, no problem."
+  },
+  {
+   "t": 9.5,
+   "clip": "recorded/demo_7_knife_quiet_part2.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 13.33,
+   "text": "P: Don't turn around. I have a knife. Pull over here. D: Okay. Okay. Please, don't hurt me. P: Give me the money and your phone. And don't press anything. D: Take it. Take everything. Please, I have kids."
+  },
+  {
+   "t": 15.5,
+   "gps": "sudden_stop",
+   "dur": 60
+  }
+ ]
+}

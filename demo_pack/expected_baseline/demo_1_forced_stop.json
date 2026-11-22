@@ -1,0 +1,28 @@
+[
+ {
+  "a": 0,
+  "b": 30,
+  "decision": "alert",
+  "reason": "The passenger is aggressively demanding the driver to stop the car.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 23,
+   "total_tokens": 890,
+   "cost": 0.00043875,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 25,
+  "b": 55,
+  "decision": "alert",
+  "reason": "The driver is attempting to de-escalate a tense situation with a passenger.",
+  "usage": {
+   "prompt_tokens": 442,
+   "completion_tokens": 27,
+   "total_tokens": 469,
+   "cost": 0.00023225,
+   "audio_tokens": 325
+  }
+ }
+]

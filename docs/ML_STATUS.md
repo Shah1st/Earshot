@@ -1,0 +1,365 @@
+# Earshot ML: status, data provenance, results, next steps
+
+Last updated: 21 Nov 2026 (evening of day 1). Branch: `ml-pipeline`. Scope: the data + ML part of
+`earshot_baseline_plan.md`. The Android app and the Unity scene are not started in this repo yet; their contract
+is in `docs/INTEGRATION.md`.
+
+## 1. What exists
+
+| Piece | Where | State |
+|---|---|---|
+| Shared contract: thresholds, groups, keyword list, GPS limits, judge prompt | `shared/config.json` (v2, current), `shared/config_v1.json` (native YAMNet groups) | frozen after tuning |
+| Sound head weights | `shared/head.json` | trained on tune clips only |
+| Reference pipeline (what the phone does) | `ml/earshot/pipeline.py`, `detector.py`, `events.py`, `asr.py`, `judge.py` | works end to end |
+| OpenRouter client: disk cache, usage log, hard spend cap | `ml/earshot/llm.py` | all calls go through it |
+| Data builders | `ml/scripts/fetch_data.py`, `fetch_real.py`, `make_dialogues.py`, `build_manifest.py` | reproducible |
+| Ride generator + renderer (audio mix and GPS track from a scenario) | `ml/scripts/make_scenarios.py`, `ml/earshot/render.py` | done |
+| Head training, threshold calibration | `ml/scripts/train_head.py`, `calibrate.py` | done |
+| Evaluation + audio LLM baseline | `ml/scripts/evaluate.py`, `baseline_audio_llm.py` | done, numbers below |
+| Team demo rides (5) | `ml/scripts/make_demo.py` → `ml/data/demo/`, `shared/scenarios/demo/` | all 5 behave as intended |
+| Unity stand-in (socket server) | `ml/scripts/stream_ride.py` | written, not yet tested against the app |
+| Hand-over bundle (models, config, 5 demo rides, expected outputs) | `ml/scripts/export_demo_pack.py` → `demo_pack/` (in git) | done |
+
+## 2. How the pipeline works now (differences from the plan are marked)
+
+1. **Sound** every 0.5 s: float YAMNet → 1,024 d embedding → logistic regression head on
+   `[embedding now, embedding 0.5 s ago]` → `loud_event` probability. Trigger: moving average over 3 chunks above
+   the threshold for 2 chunks in a row.
+   *Changed:* the plan's v1 (native YAMNet class scores) barely detects anything in driving noise, so the v2 head
+   is the default. The MediaPipe `yamnet.tflite` has no embedding output, so the app must use the float model with
+   the LiteRT interpreter (16 MB instead of 4 MB).
+2. **Speech:** Vosk small model runs **continuously** on device and keeps a rolling transcript as text.
+   A safety phrase in it opens an event (`keyword` trigger, 52 phrases in `asr.keywords`: pleas, orders,
+   threats, weapons). It was switched off after the ablation in 4.4 and switched back on with a wider list by a
+   team decision: catching more matters more than radio false alarms. The transcript is given to the judge for
+   every event either way. A calm threat is examined only if one of the phrases is recognised.
+   *Changed:* the plan transcribed only the clip around a sound event. That cannot catch a calm threat
+   ("stop the car and get out") or explain a detour, which the team's demo cases need. Cost: more CPU on the phone,
+   still 0 tokens. The plan's grammar limited keyword pass was dropped (it hallucinates, see 5).
+3. **GPS rules:** off route, sudden stop, long stop (unchanged). A new anomaly with no sound event opens a `gps`
+   event. *Changed:* the plan sent a blind check-in; now the judge reads the last 120 s of transcript, so
+   "road works, I'll go around" is dismissed.
+4. **Judge:** one text call to `google/gemini-3.1-flash-lite` per event (sound labels, GPS, transcript, earlier
+   decisions) → dismiss / check_in / alert. Very confident sound + GPS anomaly alerts at once without waiting.
+   **Wordless sounds skip the LLM** (`wordless_rule`): a sound event with at most 2 words around it becomes a
+   rider check-in (alert if a GPS anomaly is active, dismissed if YAMNet also hears laughter or coughing).
+   Measured in 4.5: neither a text judge nor an audio LLM handles wordless screams.
+5. **Privacy wording to use:** audio never leaves the phone and only a 30 s rolling audio buffer exists; a rolling
+   text transcript of at most 2 minutes is kept in memory; the LLM only ever receives a short text summary of an
+   event. A normal quiet ride sends nothing.
+
+## 3. Data: where every sound and text comes from
+
+All clips are 16 kHz mono WAV. Every clip is one row of `ml/data/manifest.csv` with its source, source id,
+licence, uploader, text and split. Nothing was recorded by us, and nothing comes from YouTube/TikTok or other
+scraped material (copyright and the privacy of real victims).
+
+| Role in a ride | Source | Licence | How it is used |
+|---|---|---|---|
+| Driving noise | **Cerence In-Car McVAMPIRE** (Zenodo 12806684): noise recorded inside a Mercedes V-class at 0/30/40/50/60 km/h | CC BY 4.0 | background loop, picked by ride speed |
+| Driving noise | **DEMAND** `TCAR` (Zenodo 1227121): recording inside a moving private car | CC BY 4.0 | background loop (30% of rides) |
+| Car acoustics | **McVAMPIRE** impulse responses: mouth simulator at each seat → roof microphone, and car loudspeakers → microphone | CC BY 4.0 | every voice and sound is convolved with a seat response, radio with the loudspeaker response |
+| Screams, shouts, thumps, breaking glass, laughter, coughs, door, horn, music, crowd | **FSD50K** (Freesound clips with human verified labels), downloaded per clip from the `Fhrozen/FSD50k` mirror; only CC0 and CC BY clips | CC0 / CC BY per clip (logged) | real recordings; alert sounds and hard negatives |
+| Shouted and neutral speech | **CREMA-D**: 91 actors saying "It's eleven o'clock" angry/fearful at high intensity, and neutral/happy takes | ODbL 1.0 | real shouting (positives for the sound head only) and real talk (negatives) |
+| Driver/passenger dialogues | **Written by us** (`ml/scripts/dialogues.py`: 21 normal, 18 threat scripts) and **acted by a speech model** (`openai/gpt-audio-mini` via OpenRouter), 2 voice pairs each | synthetic | 40 normal + 24 threat clips kept (14 of 94 requests were refused by the model, mostly aggressor lines) |
+| Radio decoys (football commentary, radio drama "help me!", adverts) | written by us, acted by the same model, crowd bed from FSD50K, band limited, played through the measured car loudspeakers | synthetic + CC | hard negatives |
+| Routes | OSRM public router, 3 routes around Lausanne | OpenStreetMap ODbL | GPS tracks |
+
+Why the mix is believable: speech and sounds are placed in the car with **measured** impulse responses, over
+**real** driving noise, at the signal to noise ratio the McVAMPIRE authors measured for real in-car speech
+(0 dB at 100 km/h, which gives about 7 dB at 40 km/h). What is **not** real: the threat conversations themselves.
+No open dataset of real in-car threats exists (the published in-car violence datasets are private or video only),
+so these are scripted and acted. This must be said when the numbers are presented.
+
+### 3.1 Split (frozen before any tuning)
+
+* **By source, never by clip:** all clips cut from one source stay together.
+  * FSD50K: by Freesound clip id (hash, 2/3 tune, 1/3 test).
+  * CREMA-D: by actor (an actor's voice is never in both).
+  * Dialogues: by script (every third script is test), so the test dialogues have **different wording and
+    situations** from the tune ones; both voice variants of a script stay together.
+  * Driving noise: McVAMPIRE tune and test use different microphones; DEMAND is split by time (first 210 s tune,
+    last 90 s test).
+* Totals: 1,002 clips; tune 59 min, test 29 min of source audio.
+* **Tune clips** build: 60 dense `train` rides (sound head training) and 24 `tune` rides (threshold calibration,
+  prompt wording). **Test clips** build 24 `test` rides that were only used for the numbers in section 4.
+* Rides are 5 minutes, seeded and reproducible (`make_scenarios.py`): real driving noise, optional radio music,
+  a harmless event every 8 to 20 s (dialogue, talk, laughter, cough, door, horn, radio), and 0 to 2 threat
+  incidents (threat dialogue, with or without a scream, a lone scream, breaking glass), some with a detour or a
+  sudden stop. 40% of rides contain no incident.
+* An incident counts as caught if an alert is raised between its first threatening sound and 10 s after its end.
+* Known limits of the benchmark: small (24 rides, 2 ride hours per split, so one incident is worth
+  several points of recall); acted threats; in 7 of the 64 evaluation dialogues (4 tune, 3 test) the speech model
+  also spoke a stage direction aloud ("nervous breath", "laughing softly"), found by a Vosk scan; the demo clips
+  are generated in a strict mode that rejects such takes, the evaluation clips were left as measured; the same speech model voices appear in tune and test (different
+  scripts); FSD50K "scream" clips include some non-human or playful screams.
+
+## 4. Results
+
+Config version 8 for v2 (`shared/config.json`), same prompt and triggers for v1 (`shared/config_v1.json`).
+All token and cost figures are the `usage` values returned by OpenRouter. Raw outputs: `ml/results/*.json`
+(git ignored; rebuild with `evaluate.py` and `baseline_audio_llm.py`, LLM replies are cached).
+
+### 4.0 Current system (config v16: wide phrase trigger on, wordless sound rule, silent GPS rule)
+
+Test split, 24 rides, 2.0 ride hours, 16 incidents:
+
+| System | Alerted | Alerted or check-in | False alerts / h | False check-ins / h | LLM calls / h | Tokens / h |
+|---|---|---|---|---|---|---|
+| Audio LLM hears everything | 16 / 16 | 16 / 16 | 16.5 | 0.5 | 144 | 126,662 |
+| **Ours, current** (wide phrase trigger) | 13 / 16 | 16 / 16 | 13.5 | 7.0 | 50 | 36,357 |
+| Ours, frugal setting (phrase trigger off, config v13) | 9 / 16 | 12 / 16 | 2.0 | 7.5 | 19.5 | 14,159 |
+
+* Current: about 3.5 times fewer tokens than the audio LLM, no audio uploaded, every incident reaches a human.
+  All 12 spoken threats are alerted; of the 4 incidents made only of real recorded sounds, 1 is alerted and 3 become
+  check-ins.
+* The team chose recall over false alarms: the phrase trigger costs false alerts (21 of the 27 quote one radio
+  drama line) and tokens. The frugal row is the same system with `asr.keyword_trigger: false`.
+* No test ride costs 0 tokens with the phrase trigger on (these rides have an event every 8 to 20 s); 6 of 24 did in
+  the frugal setting.
+* Tune split, current config: 13 / 20 alerted, 19 / 20 alerted or checked in, 1.0 false alerts / h, 5.0 false
+  check-ins / h, 19,388 tokens / h. The tune radio decoys do not include the radio drama line.
+* Tried and removed: re-examining an event right after a non-alert verdict when triggers continue. Same 13 / 16,
+  28% more tokens.
+* Measurement pitfall, fixed: for a few hours the offline replay of the speech recogniser kept only the last two
+  minutes of each ride, so the judge received empty transcripts on five minute rides. Result files written with
+  config v14 or v15 before the fix are invalid and were discarded; nothing from them is quoted here. Rides under
+  two minutes (demo, recorded) were not affected.
+* Team recordings (`ml/data/recorded/`, built with `make_recorded_demo.py`): two scenes spoken by the team, an
+  abduction with screaming and a quiet knife threat, placed in the car with driving noise. Both alert (at 23.0 s
+  and 21.0 s), also with the GPS events removed, through the phrase trigger. The sound head did not separate the
+  screaming from the quiet scene (0.99 vs 0.97; the real-only head 0.35 vs 0.40); the words did the work. Two
+  recordings, so a hint only.
+
+Sections 4.1 to 4.5 are the earlier configurations and the experiments that led here.
+
+### 4.1 Test split (24 rides, 2.0 ride hours, 16 incidents, never used for tuning)
+
+| System | Incidents alerted | False alerts / ride hour | LLM calls / h | Tokens / h | Cost / h | Audio leaving the phone |
+|---|---|---|---|---|---|---|
+| A. Audio LLM hears everything (30 s chunks, 5 s overlap, same model) | 16 / 16 (100%) | 16.5 | 144 | 126,662 | $0.062 | all of it |
+| **Ours v2** (embedding head + keywords + GPS, text judge) | 11 / 16 (69%) | 14.0 | 55.5 | 40,188 | $0.012 | none |
+| Ours v1 (native YAMNet groups instead of the head) | 10 / 16 (63%) | 15.5 | 45.0 | 31,888 | $0.010 | none |
+| Ours v2, sound trigger only (earlier build, commit `2be0ca0`: no keyword or GPS events) | 8 / 16 (50%) | 1.5 | 27.0 | 13,786 | $0.0045 | none |
+| Ours v1, sound trigger only (same earlier build) | 3 / 16 (19%) | 0.5 | 10.5 | 5,260 | $0.0017 | none |
+
+Other v2 figures: an event is opened for 13 of 16 incidents (81%; v1: 69%), harmless events judged: 94,
+of which dismissed 69%. About 720 tokens per judged event; the baseline spends about 880 tokens per 30 s chunk.
+
+How to read this honestly:
+
+* **Tokens:** about 3 times fewer than the audio LLM on these rides, which are deliberately busy (something
+  happens every 8 to 20 s; no test ride was silent enough to cost 0 tokens). The plan's "~1000x" does not hold
+  for busy rides. On a quiet ride the cost is 0: the demo ride `demo_4_normal` makes no LLM call at all.
+  The structural difference stands: the baseline uploads every second of audio, ours uploads no audio.
+* **Recall is lower than the baseline's** (69% vs 100%, on 16 incidents). The misses are mostly wordless screams
+  that neither the head nor the labels identify, and threats the judge found ambiguous.
+* **False alerts come almost entirely from one decoy.** 26 of the alerts on the test rides quote the same radio
+  line, a radio drama actress screaming "Help! Help me! Somebody call the police! He's getting away!", which as
+  text is indistinguishable from a real plea. That clip is only in the test split, so nothing was tuned for it,
+  and because the judge sees the last 45 s of transcript one occurrence can raise several alerts. The audio LLM
+  has a similar false alert rate (16.5 / h). Without keyword and GPS events (row 4) false alerts were 1.5 / h.
+* **Keyword and GPS events are a trade:** +19 points of recall and the ability to handle the team's demo cases,
+  for 3 times the tokens and the radio false alerts. Row 4 is the frugal end of the same system.
+* **The head matters for sound only detection** (50% vs 19%); once keywords are on, v1 and v2 are close because
+  most threat dialogues contain a keyword.
+
+### 4.2 Tune split (24 rides, 2.0 h, 20 incidents; used for calibration, so optimistic)
+
+v2: alerted 13 / 20 (65%; 70% counting check-ins), event opened for 95%, false alerts 1.0 / h, dismissed 94% of
+47 harmless events, 34 calls / h, 24,098 tokens / h. The tune radio decoys do not include the radio drama line,
+which is why false alerts look so much better here than on test.
+
+### 4.3 Team demo rides (`ml/data/demo/`, not part of the metrics)
+
+| Ride | What happens | System output |
+|---|---|---|
+| `demo_1_forced_stop` (38 s) | passenger rudely orders the driver to stop and get out; car stops, noise drops to idle | **alert** at 29 s (21.5 s with the keyword trigger on) |
+| `demo_2_roadworks` (46 s) | driver announces a road works detour, leaves the route, comes back | **dismiss** at 31 s ("driver explained the route change") |
+| `demo_3_shouting_detour` (42 s) | passenger shouts orders, car turns off the route | **alert** at 38.5 s, when the route is left (24 s with the keyword trigger on) |
+| `demo_4_normal` (33 s) | ordinary chat on route | nothing, 0 tokens |
+| `demo_5_engine_stall` (57 s) | engine cuts out (cabin goes quiet), driver explains, long stop | **dismiss** at 53.5 s ("minor mechanical issue") |
+
+The rides were shortened for the pitch (33 to 57 s each). To make that possible the GPS limits in the config were
+tightened **after** the section 4.1 evaluation (config v10: off route hold 10 → 5 s, long stop 60 → 30 s, endpoint
+radius 150 → 60 m); the test numbers above were measured with the old limits and have not been re-run.
+In demo rides the driving noise now follows the car (idle when stopped, near silence when the engine is off).
+
+These five rides were written after the system existed and the prompt was adjusted with them in view, so they
+show the intended behaviour, not an independent test. One aggressor line in ride 3 uses the fallback TTS voice
+because the speech model refused it.
+
+### 4.4 Ablation: what each part contributes, and how fitted it is (`ml/scripts/ablation.py`, config v11)
+
+Same rides, same judge model and prompt. "Opened" = an event reached the judge. Test split, 16 incidents:
+
+| Variant | Opened | Alerted | False alerts / h | Tokens / h | vs audio LLM (126,662) |
+|---|---|---|---|---|---|
+| Full | 13 / 16 | 11 / 16 | 14.0 | 40,524 | 3.1x fewer |
+| No keyword trigger (Vosk transcript still given to the judge) | 12 / 16 | 9 / 16 | 3.0 | 21,270 | 6.0x fewer |
+| No Vosk at all (judge sees sound labels + GPS only) | 11 / 16 | 5 / 16 | 1.5 | 18,178 | 7.0x fewer |
+| No Vosk, raw YAMNet classes instead of our head | 5 / 16 | 2 / 16 | 0.0 | 7,014 | 18x fewer |
+
+* **Trigger words** add 2 incidents on test and cause most of the false alerts and half of the tokens (the radio drama
+  decoy). They are a recall/cost dial, not the core of the system.
+* **The transcript given to the judge is the core:** without it alerts drop from 9 to 5 of 16, and GPS anomalies can
+  only produce blind check-ins.
+* **Fitted to tuning data:** with the head alone (no Vosk) an event opens for 18 / 20 incidents on tune but 11 / 16 on
+  test (90% vs 69%). On incidents with an acted dialogue: 11 / 12 on tune, 8 / 12 on test. The head partly learned
+  the tune dialogues.
+* **Real recorded sounds only (Freesound screams, glass), full system:** opened 7 / 8 on tune and 4 / 4 on test, but
+  alerted only 1 / 8 and 2 / 4. The head hears real screams; the text judge then dismisses them because there are
+  no words and YAMNet labels them "Animal" or "Siren". This is the main weakness to fix (a rule: very confident
+  sound with no speech is at least a check-in).
+* Small numbers: the real sound group is 4 incidents on test.
+
+Demo rides (216 s in total, measured):
+
+| Variant | Ride 1 forced stop | Ride 2 road works | Ride 3 shouting + detour | Ride 4 normal | Ride 5 engine stall | Tokens |
+|---|---|---|---|---|---|---|
+| Audio LLM (11 chunks) | alert | dismiss | alert | dismiss | check-in, then dismiss | 7,705 |
+| Full | alert 21.5 s | dismiss | alert 24 s | nothing | dismiss | 3,405 |
+| No keyword trigger | alert 29 s | dismiss | alert 38.5 s | nothing | dismiss | 2,760 |
+| No Vosk | **dismiss (missed)** | blind check-in | blind check-in | nothing | blind check-in | 616 |
+| Raw YAMNet, no Vosk | **nothing (missed)** | blind check-in | blind check-in | nothing | blind check-in | 0 |
+
+Without the keyword trigger both demo threats are still caught, 7.5 and 14.5 s later (through the sound head and the
+GPS anomaly). Without Vosk the system cannot tell the road works detour from the hijack. On these short, event
+packed rides the token saving against the audio LLM is 2.3x.
+
+### 4.5 Wordless sounds: text judge vs audio judge vs rule (`ml/scripts/compare_sound_paths.py`, config v12)
+
+Focused rides: real driving noise and one isolated real sound every ~20 s, no dialogues. Real threats = every
+Freesound scream and breaking glass clip of the split; harmless = laughter, coughs, doors, horns, short neutral
+speech. For each event the sound head opened, three ways of deciding were recorded on the same event.
+Test split (0.66 h, 29 real threats, 84 harmless sounds); the sound head opened 19 of the 29 threats and 7 of the
+84 harmless sounds.
+
+| Path | Threats alerted | Threats checked in | Threats dismissed | Harmless alerted | Harmless checked in | Tokens / event |
+|---|---|---|---|---|---|---|
+| A. Text judge (labels + GPS + transcript) | 5 | 4 | 10 | 2 | 0 | 692 |
+| B. Audio judge (10 s clip sent to the audio LLM) | 7 | 0 | 12 | 0 | 0 | 444 |
+| C. Rule: check in unless the top label is laughter or cough like | 0 | 19 | 0 | 0 | 6 | 0 |
+
+Tune split (1.25 h, 57 threats, 156 harmless): head opened 25 and 10; A: 2 alerts + 2 check-ins of 25; B: 6 alerts
+of 25; C: 25 check-ins, 10 harmless check-ins.
+
+* Sending the audio does not rescue wordless screams: the audio LLM dismisses most of them too. Its perfect
+  score in 4.1 came from incidents with spoken words.
+* Only the rule never drops a detected scream, at 0 tokens and with no audio leaving the phone. Its price is a
+  check-in on about 7% of loud harmless sounds (6 of 84), and the label exclusion barely helps (it removed 1).
+* The sound head itself misses a third of isolated real screams and glass on test (19 / 29) and more than half on
+  tune (25 / 57) at the current threshold, which was set to limit LLM calls.
+* Caveat: the Freesound "scream" clips were not checked by ear; some may be playful, so part of the LLM's
+  dismissals may be reasonable.
+
+### 4.6 Why YAMNet's own labels are weak here, and whether to train more (`ml/scripts/research_sound.py`)
+
+Same real clips (test split), share where YAMNet's best distress class reaches 0.3:
+
+| Condition | Scream | Glass |
+|---|---|---|
+| as recorded | 60% | 100% |
+| with car impulse response | 73% | 75% |
+| car + driving noise | 33% | 75% |
+| car + driving noise, 250 Hz high pass | 40% | 69% |
+
+The gap is the driving noise (the "Vehicle" score rises from 0.05 to 0.46), not the cabin acoustics, and a rumble
+filter does not remove it. 40% of Freesound "screams" do not reach 0.3 even clean.
+
+Detectors, thresholds set on tune rides:
+
+| Detector | Isolated real sounds (test): threats / harmless opened | Main test: acted dialogue incidents opened | Real sound incidents | False opens / h |
+|---|---|---|---|---|
+| YAMNet distress classes | 62% / 7% | 4 / 12 | 1 / 4 | 9 |
+| Current head | 83% / 13% | 11 / 12 | 3 / 4 | 31 |
+| Head trained only on real recordings + noise augmentation | 69% / 21% | 11 / 12 | 4 / 4 | 82 |
+
+* On real screams and glass the native classes are about as good as the head at the same harmless rate. The head's
+  gain is shouted speech, which YAMNet labels "Speech".
+* A head trained only on real recordings is not better (more false opens), so more training is not the lever.
+  It was not kept. It never heard an acted voice and still opens 11 / 12 acted dialogue incidents.
+* A laughter or cough label scoring ≥ 0.2 appears in 0% of opened threats and 11 to 22% of opened harmless sounds;
+  the rule uses this to skip the check-in.
+* Not tried: native classes and the head as two triggers together; features from an earlier YAMNet layer (the
+  shipped model only exposes the final embedding).
+
+### 4.7 A head trained on real recordings only (`ml/scripts/fetch_extra.py`, `train_real_head.py`)
+
+Trained on 752 real positive clips (screams, shouts, breaking glass from FSD50K, shouted speech from CREMA-D) and
+2,856 real negative clips (speech, laughter, coughs, doors, horns, everyday sounds, music), tune split only, each
+placed in the car and mixed over real driving noise. **No acted or synthesised voice in training**, so the acted
+dialogues are a clean test for it. Weights: `shared/head_real.json`; candidate config: `shared/config_real.json`
+(threshold 0.82). The default config still uses the original head.
+
+Detector only, thresholds set on tune rides for a false open budget, test rides:
+
+| Detector | Acted dialogue incidents opened | Real sound incidents | False opens / h on test | Isolated real sounds: threats / harmless |
+|---|---|---|---|---|
+| YAMNet classes (budget 15) | 4 / 12 | 1 / 4 | 15.5 | 66% / 11% |
+| Current head (budget 15) | 9 / 12 | 3 / 4 | 20.5 | 69% / 10% |
+| Real-only head (budget 15) | 6 / 12 | 3 / 4 | 12.5 | 66% / 6% |
+| Real-only head (budget 30) | 9 / 12 | 4 / 4 | 27.5 | 76% / 15% |
+| YAMNet classes + real-only head (budget 15) | 5 / 12 | 3 / 4 | 17.0 | 83% / 8% |
+
+Full pipeline on the test split (16 incidents):
+
+| Config | Alerted | Alerted or check-in | False alerts / h | False check-ins / h | Tokens / h |
+|---|---|---|---|---|---|
+| Current head (default) | 9 | 12 | 2.0 | 7.5 | 14,159 |
+| Real-only head, threshold 0.82 | 7 | 10 | 2.0 | 2.0 | 8,505 |
+
+* The real-only head's false open rate on test matches what was set on tune (12.5 for a budget of 15); the current
+  head overshoots (20.5), a sign its tune estimate is optimistic because it trained on those voices.
+* On real sounds the two are equal or the real-only head is slightly better. On acted dialogues the current head
+  opens more (it trained on that voice).
+* The real-only head scores the acted "shouting" low: 0.56 in demo ride 1 and 0.28 in demo ride 3, where the
+  current head gives 0.96 and 0.55. With it, demo ride 1 is **missed**. Either the synthetic shouting is not
+  much like real shouting, or the current head learned the synthetic voice; both readings say the same thing:
+  results on acted audio do not predict behaviour on real voices. Live voices are the test that decides.
+* Differences of one or two incidents out of 16 are within noise.
+
+## 5. Findings worth telling
+
+* **Native YAMNet classes are not enough in a car.** With the plan's groups and thresholds almost nothing fires
+  over driving noise: shouted speech is labelled "Speech", thumps "Knock", screams often "Animal" or "Siren".
+  A tiny head on YAMNet's embedding fixes most of it at the cost of one dot product per half second.
+* **Vosk keyword grammar hallucinates.** Restricting Vosk to a keyword grammar found a keyword in 48% of harmless
+  dialogues. Matching phrases in the ordinary transcript: 100% of threat dialogues, 15% of normal ones (all real
+  mentions such as "the police closed the road").
+* **The small Vosk model is good enough in driving noise** for the judge to get the gist (demo transcripts are
+  nearly verbatim) and runs about 20 times faster than real time on a laptop.
+* **The judge must not be told a score means danger.** Calling the head output "distress" made the LLM alert on
+  laughter. Renamed to `loud_event` and explained in the prompt.
+* **GPS + words beats either alone:** a detour explained in the conversation is dismissed, the same detour after
+  shouting is an alert (demo rides 2 and 3).
+
+## 6. What is ahead
+
+Must do for the demo:
+1. **Android:** implement `docs/INTEGRATION.md` (LiteRT YAMNet + head, continuous Vosk, GPS rules, judge call).
+   First check on the x86_64 emulator: both libraries load, and one inference + Vosk keep up with real time.
+   Test against `stream_ride.py` before Unity is ready.
+2. **Unity:** play `demo_pack/rides/*.wav` and replay the GPS lines, or mix from the scenario files; send the
+   socket protocol. When the real map routes exist, drop them in `shared/routes/` and re-run `make_demo.py`.
+3. **Parity check:** app decisions on the 5 demo rides vs `demo_pack/expected/*.json`.
+4. **Team's own demo audio:** if the team records or generates its own 5 clips, put the WAVs anywhere and reference
+   them in a scenario; run `evaluate.py --split demo -v` to see what the system does before going on stage.
+
+Should do if time allows:
+* More test rides and a second seed to tighten the numbers; report recall with a confidence interval.
+* Sound head: more varied shouting (real recordings), check the false triggers on laughter and coughs.
+* Radio false alerts: give the judge only the transcript since the previous decision plus a short "before" part, so one
+  radio line cannot raise several alerts; add a "sounds like the radio" cue (band limited speech, YAMNet `Radio`/`Television`).
+* Judge: the operating point is a prompt choice (see section 4); tune on tune rides only.
+* Operator Q&A (`Judge.ask`) exists but has not been evaluated.
+* Battery/CPU of continuous Vosk on a real phone is not measured.
+
+Not done from the plan: NINA real in-car data (not needed after McVAMPIRE/DEMAND), ESC-50 (FSD50K covers the same
+classes with clearer licences), Piper TTS lines (replaced by acted dialogues; Piper remains only as a fallback
+voice in `make_demo.py`).
+
+## 7. Budget
+
+All API calls are logged in `ml/results/cache/usage.jsonl`. Spend so far: $0.43 of the $10
+(dialogue acting, judge calls during tuning and evaluation, audio baseline). Cached calls are free on re-runs.

@@ -1,0 +1,189 @@
+{
+  "version": 16,
+  "audio": {
+    "sr": 16000,
+    "model": "yamnet_tfhub.tflite",
+    "chunk_s": 0.5,
+    "window_samples": 15600,
+    "buffer_s": 30,
+    "clip_pre_s": 10,
+    "clip_post_s": 5
+  },
+  "groups": {
+    "loud_event": {
+      "source": "head",
+      "classes": [],
+      "type": "sustained",
+      "threshold": 0.95,
+      "high": 0.97
+    },
+    "scream": {
+      "classes": [
+        "Screaming",
+        "Crying, sobbing",
+        "Whimper"
+      ],
+      "type": "sustained",
+      "threshold": 0.3,
+      "high": 0.7,
+      "trigger": false
+    },
+    "shout": {
+      "classes": [
+        "Shout",
+        "Yell"
+      ],
+      "type": "sustained",
+      "threshold": 0.4,
+      "high": 0.7,
+      "trigger": false
+    },
+    "impact": {
+      "classes": [
+        "Slap, smack",
+        "Thump, thud",
+        "Bang"
+      ],
+      "type": "impulsive",
+      "threshold": 0.35,
+      "high": 0.7,
+      "trigger": false
+    },
+    "glass": {
+      "classes": [
+        "Shatter",
+        "Glass"
+      ],
+      "type": "impulsive",
+      "threshold": 0.3,
+      "high": 0.7,
+      "trigger": false
+    },
+    "crash": {
+      "classes": [
+        "Smash, crash",
+        "Skidding",
+        "Tire squeal"
+      ],
+      "type": "impulsive",
+      "threshold": 0.3,
+      "high": 0.7,
+      "trigger": false
+    }
+  },
+  "event": {
+    "smooth_windows": 3,
+    "sustain_windows": 2,
+    "cooldown_s": 10,
+    "top_labels": 5,
+    "top_label_min_score": 0.1
+  },
+  "gps": {
+    "off_route_m": 150,
+    "off_route_hold_s": 5,
+    "sudden_stop_drop_kmh": 25,
+    "sudden_stop_window_s": 3,
+    "sudden_stop_latch_s": 30,
+    "stopped_speed_kmh": 3,
+    "stopped_hold_s": 30,
+    "endpoint_radius_m": 60,
+    "judge_anomalies": true,
+    "silent_check_in": true
+  },
+  "asr": {
+    "model": "vosk-model-small-en-us-0.15",
+    "min_word_conf": 0.5,
+    "keywords": [
+      "help",
+      "help me",
+      "help us",
+      "somebody help",
+      "let me out",
+      "let us out",
+      "let me go",
+      "stop the car",
+      "pull over",
+      "open the door",
+      "unlock the door",
+      "call the police",
+      "police",
+      "leave me alone",
+      "don't touch me",
+      "get off me",
+      "get away from me",
+      "don't hurt me",
+      "please don't",
+      "please stop",
+      "i can't breathe",
+      "where are you taking me",
+      "this is not the way",
+      "take me home",
+      "take me back",
+      "i want to get out",
+      "shut up",
+      "do what i say",
+      "get out",
+      "get out of the car",
+      "give me the money",
+      "give me your phone",
+      "give me your wallet",
+      "your money",
+      "your wallet",
+      "hand it over",
+      "don't move",
+      "don't turn around",
+      "keep driving",
+      "be quiet",
+      "don't press anything",
+      "hands on the wheel",
+      "knife",
+      "gun",
+      "i have a knife",
+      "i have a gun",
+      "kill you",
+      "i'll kill you",
+      "i will kill you",
+      "hurt you",
+      "i'll hurt you",
+      "shoot you"
+    ],
+    "continuous": true,
+    "context_s": 45,
+    "gps_context_s": 120,
+    "keyword_trigger": true
+  },
+  "judge": {
+    "model": "google/gemini-3.1-flash-lite",
+    "temperature": 0,
+    "max_tokens": 80,
+    "system_prompt": "You judge safety events detected in a taxi by an on-device system. Each event has a \"trigger\":\n- \"sound\": a loud or unusual sound. This also fires on laughter, coughing, lively talk and the radio, so the trigger and a high \"loud_event\" score are NOT evidence of danger by themselves.\n- \"keyword\": the speech recognizer heard a safety phrase. People also say these harmlessly (\"you can stop the car here, thanks\", a story, the radio).\n- \"gps\": the trip itself looks odd (left the planned route, sudden stop, long stop). Often innocent: road works, traffic, a detour the driver announced, a breakdown, a stop the passenger asked for.\nInputs:\n- \"top_labels\": sound classes heard. Human screams inside a noisy car are often mislabelled as Animal, Cat, Dog, Bird, Siren or Alarm, and breaking glass as Chink, Coin or Crack: with such labels and a very high \"loud_event\", never dismiss, choose check_in or alert.\n- \"gps\": trip context (reliable). off_route_m above 150, sudden_stop, or a long stop are anomalies.\n- \"keywords\" and \"transcript\": the last minute or two from a small offline recognizer, often wrong or incomplete. Read them for the gist, not exact words.\n- \"earlier\": previous decisions in this ride.\nDecide one of:\n- \"dismiss\": normal ride. Ordinary or friendly talk, laughing, radio, music, kids, phone call, or a GPS anomaly that the conversation explains calmly (road works, traffic, engine trouble, a requested stop) with nobody objecting.\n- \"check_in\": unclear, ask the rider discreetly if all is fine. Use it for a GPS anomaly with nothing said that explains it.\n- \"alert\": likely threat to someone's safety: screaming, someone asking in earnest for help, to stop the car or to be let out, orders or threats to the driver or passenger (rudely told to stop and get out, hand over things), a struggle, or shouting followed by a route change or sudden stop.\nOnly judge safety. Never judge emotions or personality.\nReply JSON: {\"decision\": \"...\", \"severity\": 1-3, \"reason\": \"<max 15 words>\"}"
+  },
+  "head": {
+    "file": "head.json"
+  },
+  "wordless_rule": {
+    "enabled": true,
+    "max_words": 2,
+    "benign_labels": [
+      "Laughter",
+      "Giggle",
+      "Snicker",
+      "Chuckle, chortle",
+      "Belly laugh",
+      "Baby laughter",
+      "Cough",
+      "Throat clearing",
+      "Sneeze"
+    ],
+    "benign_min_score": 0.2
+  },
+  "baseline": {
+    "model": "google/gemini-3.1-flash-lite",
+    "chunk_s": 30,
+    "hop_s": 25,
+    "min_tail_s": 5,
+    "max_tokens": 80,
+    "temperature": 0,
+    "prompt": "You monitor the audio of a taxi ride for passenger and driver safety. Listen to this 30 second clip.\nDecide one of:\n- \"dismiss\": normal ride (talk, radio, TV, music, laughing, kids, phone call).\n- \"check_in\": unclear, ask discreetly if all is fine.\n- \"alert\": likely threat to someone's safety (screams, fight, threats, calls for help).\nOnly judge safety. Reply JSON: {\"decision\": \"...\", \"reason\": \"<max 15 words>\"}"
+  }
+}

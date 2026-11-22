@@ -1,0 +1,39 @@
+[
+ {
+  "t": 21.5,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Passenger explicitly and repeatedly demands the driver to stop the car.",
+  "event_id": 1,
+  "event": {
+   "t": 16.5,
+   "trigger": "keyword",
+   "groups": {
+    "loud_event": 0.98
+   },
+   "duration_s": 0.5,
+   "top_labels": {
+    "Speech": 0.99
+   },
+   "gps": {
+    "speed_kmh": 50.0,
+    "off_route_m": 1,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "stop the car"
+   ],
+   "transcript": "evening to the old town please near the cathedral shit about ten minutes hey stop the can't stop the car now i said stop"
+  },
+  "usage": {
+   "prompt_tokens": 606,
+   "completion_tokens": 29,
+   "total_tokens": 635,
+   "cost": 0.000195,
+   "audio_tokens": 0
+  }
+ }
+]
