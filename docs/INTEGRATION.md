@@ -159,6 +159,10 @@ Everything is in `config.baseline`; expected answers and token counts per demo r
 
 ### 2.8 What the UI gets
 
+**Demo mapping (decided with the team):** everything goes to the operator screen, no rider prompt. `alert` = red
+card, `check_in` = amber card ("needs a look"), `dismiss` = grey line in the log. The pipeline output is unchanged;
+this is only how the app shows it.
+
 Each decision: time, `dismiss` (grey) / `check_in` (ask the rider) / `alert` (silent operator alert), source
 (`rule`, `llm`), one line reason, tokens used. For the parity check, write them as JSON lines and compare with
 `expected/<id>.json` (same times within 0.5 s, same decisions).
