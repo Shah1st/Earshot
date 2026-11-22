@@ -1,7 +1,8 @@
 """Continuous on-device speech recognition with Vosk (0 LLM tokens).
 
 The recogniser runs on every 0.5 s chunk and gives the pipeline two things:
-  * a rolling transcript kept in memory as text only (the judge gets the last 45 to 120 s of it);
+  * a rolling transcript kept in memory as text only: at most the last 120 s (asr.gps_context_s), older words
+    are dropped; the judge gets the last 45 s for sound events and the last 120 s for GPS events;
   * keyword triggers: a safety phrase appearing in the transcript opens an event even when nobody shouts.
 
 Keywords are phrases matched in the FREE transcript. The grammar limited pass from the first plan was
@@ -59,6 +60,9 @@ class StreamAsr:
     def _take(self, result: dict) -> list[str]:
         words = [w for w in result.get("result", []) if w["conf"] >= self.cfg["min_word_conf"]]
         self.words += [(w["word"], w["start"], w["end"]) for w in words]
+        if self.words:  # rolling memory: forget everything older than the longest context the judge can be given
+            keep = self.words[-1][2] - max(self.cfg["context_s"], self.cfg["gps_context_s"])
+            self.words = [w for w in self.words if w[2] > keep]
         hits = self._new_hits(" ".join(w["word"] for w in words))
         self.partial, self.fired = "", {}
         return hits
