@@ -130,6 +130,11 @@ class RidePipeline:
         else:
             payload.update(keywords=[], transcript="")
         rule = self.cfg.get("wordless_rule", {})
+        if ev["trigger"] == "gps" and self.asr is not None and self.cfg["gps"].get("silent_check_in", True):
+            # GPS anomaly and nobody said anything in the last two minutes: the judge would have nothing to read
+            # and could only answer "check in", so do that directly, for 0 tokens
+            if len(payload["transcript"].split()) <= rule.get("max_words", 2):
+                return self._emit(now, "check_in", "rule", 1, f"{ev['note']}, nothing said", payload, None, ev["id"])
         if rule.get("enabled") and ev["trigger"] == "sound" and self.asr is not None:
             # A loud sound with no words around it: a text judge has nothing to read (and measured, an audio LLM
             # dismisses most wordless screams too). So no LLM call: ask the rider, unless YAMNet also hears

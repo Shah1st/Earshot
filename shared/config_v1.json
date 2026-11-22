@@ -1,5 +1,5 @@
 {
-  "version": 10,
+  "version": 11,
   "audio": {
     "sr": 16000,
     "model": "yamnet_tfhub.tflite",
@@ -75,7 +75,8 @@
     "stopped_speed_kmh": 3,
     "stopped_hold_s": 30,
     "endpoint_radius_m": 60,
-    "judge_anomalies": true
+    "judge_anomalies": true,
+    "silent_check_in": true
   },
   "asr": {
     "model": "vosk-model-small-en-us-0.15",
@@ -126,5 +127,14 @@
       "Sneeze"
     ],
     "benign_min_score": 0.2
+  },
+  "baseline": {
+    "model": "google/gemini-3.1-flash-lite",
+    "chunk_s": 30,
+    "hop_s": 25,
+    "min_tail_s": 5,
+    "max_tokens": 80,
+    "temperature": 0,
+    "prompt": "You monitor the audio of a taxi ride for passenger and driver safety. Listen to this 30 second clip.\nDecide one of:\n- \"dismiss\": normal ride (talk, radio, TV, music, laughing, kids, phone call).\n- \"check_in\": unclear, ask discreetly if all is fine.\n- \"alert\": likely threat to someone's safety (screams, fight, threats, calls for help).\nOnly judge safety. Reply JSON: {\"decision\": \"...\", \"reason\": \"<max 15 words>\"}"
   }
 }
