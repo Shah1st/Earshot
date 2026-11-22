@@ -1,0 +1,36 @@
+[
+ {
+  "t": 53.5,
+  "type": "decision",
+  "decision": "dismiss",
+  "source": "llm",
+  "severity": 1,
+  "reason": "Driver explained the stop due to a minor mechanical issue; passenger is not concerned.",
+  "event_id": 1,
+  "event": {
+   "t": 48.5,
+   "trigger": "gps: long stop away from pickup/drop off",
+   "groups": {},
+   "duration_s": 0.0,
+   "top_labels": {
+    "Silence": 1.0,
+    "Speech": 1.0
+   },
+   "gps": {
+    "speed_kmh": 0.0,
+    "off_route_m": 1,
+    "sudden_stop": false,
+    "stopped_s": 35.0
+   },
+   "keywords": [],
+   "transcript": "hi to the airport is no rush three hours that's engine just cut is everything okay yeah yeah nothing dangerous sorry about this give me a couple of minutes and need to check with the problem is sure take your time on not in a hurry okay i think it's just the battery table one more minute and we can go no worries at all"
+  },
+  "usage": {
+   "prompt_tokens": 653,
+   "completion_tokens": 33,
+   "total_tokens": 686,
+   "cost": 0.00021275,
+   "audio_tokens": 0
+  }
+ }
+]

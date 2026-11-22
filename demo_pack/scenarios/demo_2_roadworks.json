@@ -1,0 +1,39 @@
+{
+ "id": "demo_2_roadworks",
+ "split": "demo",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 46,
+ "expected_outcome": "dismiss",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "demo/demo_2_roadworks_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 15.75,
+   "text": "P: Hi. The train station, please. D: No problem. Just so you know, there are road works on the main avenue today, so I'll take the side streets. It's a small detour, but we get to the same place. P: Oh, okay. No problem, thanks for telling me."
+  },
+  {
+   "t": 12.7,
+   "gps": "bypass",
+   "dur": 36,
+   "offset_m": 350
+  },
+  {
+   "t": 28.7,
+   "clip": "demo/demo_2_roadworks_part2.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 8.79,
+   "text": "P: Is it much longer this way? D: Two more minutes, that's all. We're nearly back on the main road. P: Perfect, thank you."
+  }
+ ]
+}

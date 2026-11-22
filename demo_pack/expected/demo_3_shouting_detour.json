@@ -1,0 +1,44 @@
+[
+ {
+  "t": 38.5,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Aggressive verbal commands and threats indicate a potential safety threat to the driver.",
+  "event_id": 1,
+  "event": {
+   "t": 33.5,
+   "trigger": "gps: left the planned route",
+   "groups": {
+    "loud_event": 0.77
+   },
+   "duration_s": 0.0,
+   "top_labels": {
+    "Vehicle": 0.54,
+    "Bee, wasp, etc.": 0.47,
+    "Insect": 0.45,
+    "Fly, housefly": 0.42,
+    "Bicycle": 0.21
+   },
+   "gps": {
+    "speed_kmh": 49.8,
+    "off_route_m": 281,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "do what i say",
+    "shut up"
+   ],
+   "transcript": "could you go a little faster i'm late sweden are you deaf i said drive faster loot don't show shut up and turn your turn right now do what i say okay okay i'm turning please"
+  },
+  "usage": {
+   "prompt_tokens": 671,
+   "completion_tokens": 32,
+   "total_tokens": 703,
+   "cost": 0.00021575,
+   "audio_tokens": 0
+  }
+ }
+]
