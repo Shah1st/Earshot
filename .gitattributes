@@ -1,0 +1,4 @@
+# model files and demo data must be byte identical on every machine (no line ending conversion)
+demo_pack/models/** -text
+demo_pack/rides/** -text
+demo_pack/clips/** -text
