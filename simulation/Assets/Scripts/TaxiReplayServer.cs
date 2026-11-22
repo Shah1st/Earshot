@@ -20,6 +20,8 @@ namespace Earshot.Simulation
         private volatile State state = State.Waiting;
         private volatile bool disposed;
         private ReferenceRide ride;
+        private Func<int, ReplayGpsFix> sampleGps;
+        private ReplayGpsFix nextFix;
         private int nextTick;
         private bool ending;
 
@@ -37,11 +39,15 @@ namespace Earshot.Simulation
             worker.Start();
         }
 
-        public void Begin(ReferenceRide reference)
+        public void Begin(ReferenceRide reference, Func<int, ReplayGpsFix> liveGps = null)
         {
             if (state != State.Connected || ride != null)
                 throw new InvalidOperationException("Start a ride only after a receiver connects.");
             ride = reference ?? throw new ArgumentNullException(nameof(reference));
+            if (ride.Gps == null && liveGps == null)
+                throw new ArgumentException("This ride needs a live GPS sampler.", nameof(liveGps));
+            sampleGps = liveGps;
+            nextFix = sampleGps?.Invoke(0);
             state = State.Streaming;
             Queue(ride.StartMessage());
         }
@@ -53,9 +59,11 @@ namespace Earshot.Simulation
 
             while (nextTick < ride.TickCount && playbackSeconds >= (nextTick + 1) * ReferenceRide.TickSeconds)
             {
-                if (!Queue(ride.TickMessages(nextTick)))
+                if (!Queue(ride.TickMessages(nextTick, nextFix)))
                     return;
                 nextTick++;
+                if (nextTick < ride.TickCount)
+                    nextFix = sampleGps?.Invoke(nextTick);
             }
 
             if (nextTick == ride.TickCount && Queue(ride.StopMessage()))

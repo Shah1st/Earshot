@@ -294107,7 +294107,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Earshot.Simulation.TaxiScenarioRunner
   scenarioConfig: {fileID: 4900000, guid: 5dfc213eb720450d8257093a4a95082d, type: 3}
-  scenarioIndex: 1
+  scenarioIndex: 4
+  streamToAndroid: 1
 --- !u!1001 &1634422690
 PrefabInstance:
   m_ObjectHideFlags: 0

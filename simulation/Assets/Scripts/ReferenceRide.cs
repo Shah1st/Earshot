@@ -35,28 +35,29 @@ namespace Earshot.Simulation
         public string Id { get; }
         public ReplayCoordinate[] Route { get; }
         public ReplayGpsFix[] Gps { get; }
-        public int TickCount => Gps.Length;
+        public int TickCount => pcm.Length / BytesPerTick;
 
         public ReferenceRide(string id, ReplayCoordinate[] route, ReplayGpsFix[] gps, byte[] pcm)
+            : this(id, route, pcm)
+        {
+            if (gps == null || gps.Length != TickCount)
+                throw new InvalidDataException("The ride must have one GPS record per complete audio chunk.");
+            for (int i = 0; i < gps.Length; i++)
+                ValidateFix(i, gps[i]);
+            Gps = gps;
+        }
+
+        public ReferenceRide(string id, ReplayCoordinate[] route, byte[] pcm)
         {
             if (string.IsNullOrEmpty(id) || !Regex.IsMatch(id, "\\A[a-zA-Z0-9_-]+\\z"))
                 throw new InvalidDataException("The ride ID must contain only letters, digits, hyphens or underscores.");
             if (route == null || route.Length < 2 || route.Any(p => p == null || !ValidLocation(p.lat, p.lon)))
                 throw new InvalidDataException("The ride needs a valid planned route.");
-            if (gps == null || pcm == null || gps.Length == 0 || pcm.Length != (long)gps.Length * BytesPerTick)
-                throw new InvalidDataException("The ride must have one GPS record per complete audio chunk.");
-
-            for (int i = 0; i < gps.Length; i++)
-            {
-                ReplayGpsFix fix = gps[i];
-                if (fix == null || fix.t != i * TickSeconds || !ValidLocation(fix.lat, fix.lon)
-                    || !Finite(fix.speed_kmh) || fix.speed_kmh < 0)
-                    throw new InvalidDataException($"Invalid GPS record at tick {i}.");
-            }
+            if (pcm == null || pcm.Length == 0 || pcm.Length % BytesPerTick != 0)
+                throw new InvalidDataException("The ride must contain complete audio chunks.");
 
             Id = id;
             Route = route;
-            Gps = gps;
             this.pcm = pcm;
         }
 
@@ -114,9 +115,10 @@ namespace Earshot.Simulation
         public string StartMessage() => "{\"type\":\"start\",\"ride_id\":\"" + Id + "\",\"route\":["
             + string.Join(",", Route.Select(p => $"[{Number(p.lat)},{Number(p.lon)}]")) + "]}\n";
 
-        public string TickMessages(int tick)
+        public string TickMessages(int tick, ReplayGpsFix liveFix = null)
         {
-            ReplayGpsFix fix = Gps[tick];
+            ReplayGpsFix fix = liveFix ?? Gps?[tick];
+            ValidateFix(tick, fix);
             string time = Number(fix.t);
             string data = Convert.ToBase64String(pcm, tick * BytesPerTick, BytesPerTick);
             return $"{{\"type\":\"gps\",\"t\":{time},\"lat\":{Number(fix.lat)},\"lon\":{Number(fix.lon)},\"speed_kmh\":{Number(fix.speed_kmh)}}}\n"
@@ -124,6 +126,13 @@ namespace Earshot.Simulation
         }
 
         public string StopMessage() => "{\"type\":\"stop\",\"ride_id\":\"" + Id + "\"}\n";
+
+        private static void ValidateFix(int tick, ReplayGpsFix fix)
+        {
+            if (fix == null || fix.t != tick * TickSeconds || !ValidLocation(fix.lat, fix.lon)
+                || !Finite(fix.speed_kmh) || fix.speed_kmh < 0)
+                throw new InvalidDataException($"Invalid GPS record at tick {tick}.");
+        }
 
         private static string Number(double value) => value.ToString("R", CultureInfo.InvariantCulture);
         private static string ReadTag(BinaryReader input) => Encoding.ASCII.GetString(input.ReadBytes(4));
