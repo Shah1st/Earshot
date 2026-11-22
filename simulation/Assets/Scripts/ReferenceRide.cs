@@ -101,7 +101,9 @@ namespace Earshot.Simulation
             return samples;
         }
 
-        public float[] PlaybackSamples()
+        public float[] PlaybackSamples() => PlaybackSamples(pcm);
+
+        internal static float[] PlaybackSamples(byte[] pcm)
         {
             var samples = new float[pcm.Length / sizeof(short)];
             for (int i = 0; i < samples.Length; i++)
