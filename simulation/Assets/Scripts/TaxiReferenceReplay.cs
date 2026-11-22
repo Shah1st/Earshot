@@ -23,7 +23,6 @@ namespace Earshot.Simulation
             public ReplayCoordinate[] route = null;
         }
 
-        [SerializeField] private string rideId = "demo_2_roadworks";
         [SerializeField] private int port = 5005;
 
         private static readonly Color PlannedColor = new Color(0.32f, 0.70f, 1f);
@@ -39,6 +38,11 @@ namespace Earshot.Simulation
         private bool started;
         private bool previousRunInBackground;
         private string startupError;
+        private RideManifest manifest;
+        private readonly TaxiScenarioMenu menu = new TaxiScenarioMenu();
+        private string[] scenarioIds = Array.Empty<string>();
+        private int selectedRide = -1;
+        private string folder;
 
         private void Awake()
         {
@@ -50,16 +54,29 @@ namespace Earshot.Simulation
         {
             try
             {
-                string folder = Path.Combine(Application.streamingAssetsPath, "ReferenceRides");
-                var manifest = JsonUtility.FromJson<RideManifest>(File.ReadAllText(Path.Combine(folder, "replay.json")));
-                if (manifest?.rides == null || manifest.sampleRate != ReferenceRide.SampleRate
-                    || manifest.samplesPerTick != ReferenceRide.SamplesPerTick)
+                folder = Path.Combine(Application.streamingAssetsPath, "ReferenceRides");
+                manifest = JsonUtility.FromJson<RideManifest>(File.ReadAllText(Path.Combine(folder, "replay.json")));
+                if (manifest?.rides == null || manifest.rides.Length == 0 || manifest.sampleRate != ReferenceRide.SampleRate
+                    || manifest.samplesPerTick != ReferenceRide.SamplesPerTick
+                    || manifest.rides.Any(entry => string.IsNullOrEmpty(entry?.id)))
                     throw new InvalidDataException("Invalid reference ride manifest.");
+                scenarioIds = manifest.rides.Select(entry => entry.id).ToArray();
+            }
+            catch (Exception exception)
+            {
+                startupError = exception.Message;
+                Debug.LogError($"Earshot replay: {startupError}", this);
+            }
+        }
 
-                RideEntry entry = Array.Find(manifest.rides, candidate => candidate?.id == rideId);
-                if (entry == null)
-                    throw new InvalidDataException($"Unknown reference ride {rideId}.");
-
+        private void LoadRide(int index)
+        {
+            if (selectedRide >= 0)
+                return;
+            try
+            {
+                startupError = null;
+                RideEntry entry = manifest.rides[index];
                 var fixes = File.ReadLines(Path.Combine(folder, entry.id + ".gps.jsonl"))
                     .Select(JsonUtility.FromJson<ReplayGpsFix>).ToArray();
                 ride = new ReferenceRide(entry.id, entry.route, fixes,
@@ -67,7 +84,7 @@ namespace Earshot.Simulation
                 FitMap();
 
                 float[] samples = ride.PlaybackSamples();
-                clip = AudioClip.Create(rideId, samples.Length, 1, ReferenceRide.SampleRate, false);
+                clip = AudioClip.Create(entry.id, samples.Length, 1, ReferenceRide.SampleRate, false);
                 if (!clip.SetData(samples, 0))
                     throw new InvalidOperationException("Unity could not load the reference audio.");
 
@@ -76,10 +93,13 @@ namespace Earshot.Simulation
                 player.loop = false;
                 player.spatialBlend = 0;
                 server = new TaxiReplayServer(port);
-                Debug.Log($"Earshot replay waiting on 127.0.0.1:{server.Port} for {rideId}.", this);
+                selectedRide = index;
+                Debug.Log($"Earshot replay waiting on 127.0.0.1:{server.Port} for {entry.id}.", this);
             }
             catch (Exception exception)
             {
+                if (clip != null)
+                    Destroy(clip);
                 startupError = exception.Message;
                 Debug.LogError($"Earshot replay: {startupError}", this);
             }
@@ -137,22 +157,25 @@ namespace Earshot.Simulation
 
         private void OnGUI()
         {
-            GUILayout.BeginArea(new Rect(16, 16, Mathf.Max(1, Screen.width - 32), 100));
-            GUILayout.Label($"Earshot / {rideId}");
-            GUILayout.Label(startupError ?? server?.Error ?? ConnectionStatus());
+            string status = startupError ?? server?.Error ?? ConnectionStatus();
             if (server != null && server.QueuedTicks > 0)
             {
                 int tick = server.QueuedTicks - 1;
                 ReplayGpsFix fix = ride.Gps[tick];
-                GUILayout.Label($"{(tick + 1) * ReferenceRide.TickSeconds:0.0} s   |   "
-                    + $"{fix.speed_kmh:0} km/h   |   {fix.lat:F5}, {fix.lon:F5}");
+                status += $"\n{(tick + 1) * ReferenceRide.TickSeconds:0.0} s · {fix.speed_kmh:0} km/h"
+                    + $"\n{fix.lat:F5}, {fix.lon:F5}";
             }
-            GUILayout.EndArea();
+            menu.Draw(gameObject.scene, scenarioIds, selectedRide, status, LoadRide);
 
-            if (planned == null || Event.current.type != EventType.Repaint || Screen.height < 160 || Screen.width < 120)
+            if (selectedRide < 0 || Event.current.type != EventType.Repaint)
                 return;
 
-            var frame = new Rect(26, 122, Screen.width - 52, Screen.height - 148);
+            bool sideBySide = Screen.width >= 640;
+            int left = sideBySide ? TaxiScenarioMenu.PanelWidth + 48 : 26;
+            int top = sideBySide ? 48 : 154;
+            var frame = new Rect(left, top, Screen.width - left - 26, Screen.height - top - 26);
+            if (frame.width < 100 || frame.height < 40)
+                return;
             float scale = Mathf.Min(frame.width / mapBounds.width, frame.height / mapBounds.height);
             Vector2 Plot(Vector2 point) => frame.center + (point - mapBounds.center) * scale;
             for (int i = 1; i < planned.Length; i++)
@@ -166,8 +189,8 @@ namespace Earshot.Simulation
                 Vector2 car = Plot(actual[count - 1]);
                 GUI.DrawTexture(new Rect(car.x - 4, car.y - 4, 8, 8), Texture2D.whiteTexture);
             }
-            GUI.Label(new Rect(20, 92, 100, 22), "<color=#52b3ff>Planned route</color>");
-            GUI.Label(new Rect(120, 92, 100, 22), "<color=#5ef2a6>Actual route</color>");
+            GUI.Label(new Rect(left, top - 25, 100, 22), "<color=#52b3ff>Planned route</color>");
+            GUI.Label(new Rect(left + 100, top - 25, 100, 22), "<color=#5ef2a6>Actual route</color>");
         }
 
         private string ConnectionStatus()
@@ -177,7 +200,7 @@ namespace Earshot.Simulation
                 case TaxiReplayServer.State.Waiting: return $"Waiting for Android or a test receiver on port {server.Port}";
                 case TaxiReplayServer.State.Connected: return "Receiver connected";
                 case TaxiReplayServer.State.Streaming: return "Streaming GPS and audio";
-                case TaxiReplayServer.State.Finished: return "Ride complete. Restart Play Mode for another connection.";
+                case TaxiReplayServer.State.Finished: return "Ride complete";
                 default: return string.Empty;
             }
         }
