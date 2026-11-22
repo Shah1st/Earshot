@@ -1,5 +1,5 @@
 {
-  "version": 12,
+  "version": 14,
   "audio": {
     "sr": 16000,
     "model": "yamnet_tfhub.tflite",

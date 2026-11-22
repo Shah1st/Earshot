@@ -41,7 +41,7 @@ class RidePipeline:
         self.gps = GpsContext(cfg, route)
         self.event: dict | None = None
         self.prev_emb: np.ndarray | None = None
-        self.last_trigger = -1e9
+        self.last_trigger = -1e9  # when the last event opened
         self.merged_alerted = False  # a rule alert was already sent for the current merged event
         self.prev_flags = {k: False for k in GPS_FLAGS}
         self.outputs: list[dict] = []
@@ -89,9 +89,10 @@ class RidePipeline:
         new = []
 
         if fired or heard:
+            # The cooldown runs from when the previous event OPENED; triggers do not extend it. So while trouble
+            # continues a new event opens every 10 s and is judged with the newer transcript.
             if self.event is None and now - self.last_trigger >= self.cfg["event"]["cooldown_s"]:
                 self._open(now, "sound" if fired else "keyword")
-            self.last_trigger = now  # cooldown: later triggers merge into the same event
             # clear case: very confident sound + GPS anomaly -> alert now, do not wait for the LLM
             high = [g for g in fired if gs[g] >= groups[g]["high"]]
             if high and self.gps.state["anomaly"] and not self.merged_alerted:
