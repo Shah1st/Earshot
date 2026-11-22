@@ -1,6 +1,7 @@
 """Build the five demo rides from the team's own voice recordings instead of the synthesised voices.
 
-Put one audio file per dialogue part in ml/data/recorded/ (wav, m4a, mp3, ogg... anything ffmpeg reads):
+Put one audio file per dialogue part in ml/data/recorded/ (wav, m4a, mp3, ogg... anything ffmpeg reads),
+or one file for a whole scene named <ride id>.* (it is then cut at its longest pauses):
 
     demo_1_forced_stop_part1.*   demo_1_forced_stop_part2.*
     demo_2_roadworks_part1.*     demo_2_roadworks_part2.*
@@ -72,6 +73,23 @@ def load_any(path: Path) -> np.ndarray:
     return read_audio(tmp)
 
 
+def split_on_pauses(x: np.ndarray, n_parts: int) -> list[np.ndarray]:
+    """One recording of a whole scene -> its parts, cut in the middle of the (n_parts - 1) longest pauses."""
+    hop = SR // 10
+    level = np.sqrt(np.mean(x[: len(x) // hop * hop].reshape(-1, hop) ** 2, axis=1))
+    quiet = level < max(level.max() * 10 ** (-35 / 20), 1e-4)
+    voiced = np.flatnonzero(~quiet)
+    runs, start = [], None
+    for i in range(voiced[0], voiced[-1] + 1):  # pauses inside the speech only, not the silence around it
+        if quiet[i] and start is None:
+            start = i
+        if not quiet[i] and start is not None:
+            runs.append((i - start, (start + i) // 2))
+            start = None
+    cuts = sorted(mid * hop for _, mid in sorted(runs, reverse=True)[: n_parts - 1])
+    return [seg for seg in np.split(x, cuts)]
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry", action="store_true", help="do not add the car impulse response (recorded in a real car)")
@@ -81,13 +99,17 @@ def main() -> None:
         d.mkdir(parents=True)
     for rid, spec in RIDES.items():
         files = [next(iter(sorted(IN.glob(f"{rid}_part{k + 1}.*"))), None) for k in range(len(spec["parts"]))]
-        if None in files:
+        whole = next(iter(sorted(f for f in IN.glob(f"{rid}.*") if f.is_file())), None)
+        if None in files and whole is not None:  # the whole scene in one file: cut it at the pauses
+            files = split_on_pauses(load_any(whole), len(spec["parts"]))
+            print(f"{rid}: one recording, split into parts of {[round(len(f) / SR, 1) for f in files]} s")
+        if any(f is None for f in files):
             print(f"{rid}: skipped, missing part(s) {[k + 1 for k, f in enumerate(files) if f is None]}")
             continue
         events, at, t = [], {}, 0.0
         for k, ((gap, turns), f) in enumerate(zip(spec["parts"], files)):
             loud = any(d.startswith("LOUD:") for _, d, _ in turns)
-            x = normalise(trim(load_any(f), thr=0.02))
+            x = normalise(trim(f if isinstance(f, np.ndarray) else load_any(f), thr=0.02))
             if not args.dry:
                 x = normalise(in_car(x, "passenger", seed=k))
             x = x * (1.6 if loud else 1.0)  # same level convention as the synthesised parts
