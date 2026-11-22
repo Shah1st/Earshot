@@ -19,8 +19,12 @@ the ride, then the simulator closes the TCP connection.
 
 The five fixtures are in `Assets/StreamingAssets/ReferenceRides`. The replay uses the WAVs and
 GPS traces exported in the ML demo pack at `1453e82`. The manifest contains the corresponding
-planned route. Fetch Git LFS content before opening this scene. The interactive city scene is
-`Assets/Scenes/LauzHackSimulation.unity`.
+planned route. Fetch Git LFS content before opening either scene.
+
+The interactive city scene, `Assets/Scenes/LauzHackSimulation.unity`, plays the same WAVs
+at pickup. The `playReferenceRide` and `cues` fields in `Assets/Scenarios/TaxiScenarios.json`
+select the recording and time the movement cues against it. For each detour, the cue
+queues the turn at the next route fork while the navigator continues to display its original route.
 
 Driving noise from Cerence In-Car McVAMPIRE (Mueller and Wolff, 2024), licensed [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 Routes use data © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), routed with OSRM.

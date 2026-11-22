@@ -11,39 +11,38 @@
   ],
   "scenarios": [
     {
-      "id": "stop_demand",
+      "id": "demo_1_forced_stop",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
-      "events": [{ "atMarker": "first_block", "playAudio": "stop_the_car", "cues": [
-        { "atSeconds": 3.0, "action": "brake_to_stop" }
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_1_forced_stop", "cues": [
+        { "atSeconds": 25.8, "action": "brake_to_stop" }
       ] }]
     },
     {
-      "id": "roadwork_detour",
+      "id": "demo_2_roadworks",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
       "drivingRoute": ["pickup", "first_block", "market", "fork_approach", "northwest", "north_cross", "destination"],
-      "events": [{ "atMarker": "first_block", "playAudio": "roadwork_explanation", "cues": [
-        { "atSeconds": 3.8, "action": "switch_route" }
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_2_roadworks", "cues": [
+        { "atSeconds": 12.7, "action": "switch_route" }
       ] }]
     },
     {
-      "id": "yelling_detour",
+      "id": "demo_3_shouting_detour",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
       "drivingRoute": ["pickup", "first_block", "market", "fork_approach", "northwest", "north_cross", "destination"],
-      "events": [{ "atMarker": "market", "playAudio": "yelling", "cues": [
-        { "atSeconds": 2.0, "action": "switch_route" }
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_3_shouting_detour", "cues": [
+        { "atSeconds": 18.4, "action": "switch_route" }
       ] }]
     },
     {
-      "id": "normal_ride",
+      "id": "demo_4_normal",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
-      "events": [{ "atMarker": "first_block", "playAudio": "normal_conversation" }]
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_4_normal" }]
     },
     {
-      "id": "engine_stall",
+      "id": "demo_5_engine_stall",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
-      "events": [{ "atMarker": "market", "playAudio": "engine_stall", "cues": [
-        { "atSeconds": 0.0, "action": "brake_to_stop" },
-        { "atSeconds": 67.0, "action": "resume" }
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_5_engine_stall", "cues": [
+        { "atSeconds": 10.2, "action": "brake_to_stop" }
       ] }]
     }
   ]
