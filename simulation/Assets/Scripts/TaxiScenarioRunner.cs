@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using UnityEngine;
 
 namespace Earshot.Simulation
@@ -12,6 +14,7 @@ namespace Earshot.Simulation
     {
         [SerializeField] private TextAsset scenarioConfig;
         [SerializeField, Min(0)] private int scenarioIndex;
+        [SerializeField] private bool streamToAndroid;
 
         [Serializable] private sealed class Config { public Marker[] markers; public Scenario[] scenarios; }
         [Serializable] private sealed class Marker { public string id; public Vector3 position; }
@@ -45,6 +48,7 @@ namespace Earshot.Simulation
 
         private TaxiRoutePlanner planner;
         private TaxiRouteDriver driver;
+        private TaxiRouteNavigator navigator;
         private TaxiRoutePlanner.Route alternate;
         private int forkIndex;
         private List<PreparedEvent> events = new List<PreparedEvent>();
@@ -52,11 +56,18 @@ namespace Earshot.Simulation
         private readonly List<AudioSource> audioSources = new List<AudioSource>();
         private readonly List<AudioClip> generatedClips = new List<AudioClip>();
         private const double AudioScheduleLead = 0.08;
+        private TaxiReplayServer server;
+        private ReferenceRide streamRide;
+        private TaxiRoutePlanner.Route readyRoute;
+        private float readyApproachSpeed;
+        private double audioStart;
+        private string streamError;
 
         private void Awake()
         {
             planner = GetComponent<TaxiRoutePlanner>();
             driver = GetComponent<TaxiRouteDriver>();
+            navigator = GetComponent<TaxiRouteNavigator>();
         }
 
         private void OnEnable() => driver.WaypointReached += OnWaypointReached;
@@ -116,18 +127,61 @@ namespace Earshot.Simulation
                 var prepared = PrepareEvents(scenario, planned, detour);
                 float approachSpeed = GetApproachSpeedLimit(prepared, planned, fork);
                 ClearTimeline();
+                streamError = null;
                 scenarioIndex = index;
                 alternate = detour;
                 forkIndex = fork;
                 events = prepared;
-                driver.StartScenarioRoute(planned, approachSpeed);
+                if (streamToAndroid)
+                {
+                    driver.StopRide();
+                    streamRide = PrepareStream(scenario.id, planned, prepared);
+                    server = new TaxiReplayServer(5005);
+                    readyRoute = planned;
+                    readyApproachSpeed = approachSpeed;
+                    Debug.Log($"Taxi city scene waiting for Android on 127.0.0.1:{server.Port}.", this);
+                }
+                else
+                {
+                    driver.StartScenarioRoute(planned, approachSpeed);
+                }
                 planner.SetPlannedRoute(planned);
                 Debug.Log($"Taxi scenario {index + 1}/{config.scenarios.Length}: {scenario.id}", this);
             }
-            catch (Exception error) when (error is ArgumentException || error is IOException || error is InvalidDataException)
+            catch (Exception error) when (error is ArgumentException || error is IOException
+                || error is InvalidDataException || error is SocketException)
             {
+                streamError = error.Message;
                 Debug.LogError($"Taxi scenario: {error.Message}", this);
             }
+        }
+
+        private ReferenceRide PrepareStream(string id, TaxiRoutePlanner.Route planned, List<PreparedEvent> prepared)
+        {
+            if (navigator == null)
+                throw new ArgumentException("Assign a TaxiRouteNavigator for Android GPS streaming.");
+            var audio = prepared.Where(entry => entry.ReferencePcm != null || entry.Clip != null).ToArray();
+            if (audio.Length != 1 || audio[0].PlannedIndex != 0 || audio[0].ReferencePcm == null)
+                throw new ArgumentException("Android streaming needs one reference WAV that starts at pickup.");
+
+            var route = planned.Waypoints.Select(position =>
+            {
+                TaxiGpsCoordinate point = navigator.ProjectGps(position);
+                return new ReplayCoordinate { lat = point.Latitude, lon = point.Longitude };
+            }).ToArray();
+            return new ReferenceRide(id, route, audio[0].ReferencePcm);
+        }
+
+        private ReplayGpsFix SampleGps(int tick)
+        {
+            TaxiGpsCoordinate point = navigator.ProjectGps(driver.WorldPosition);
+            return new ReplayGpsFix
+            {
+                t = tick * ReferenceRide.TickSeconds,
+                lat = point.Latitude,
+                lon = point.Longitude,
+                speed_kmh = driver.SpeedKmh
+            };
         }
 
         private TaxiRoutePlanner.Route BuildRoute(string[] ids, Dictionary<string, Vector3> markers, string field)
@@ -249,6 +303,8 @@ namespace Earshot.Simulation
                 if (clip != null)
                 {
                     startTime = AudioSettings.dspTime + AudioScheduleLead;
+                    if (server != null && entry.ReferencePcm != null)
+                        audioStart = startTime;
                     var source = gameObject.AddComponent<AudioSource>();
                     audioSources.Add(source);
                     source.playOnAwake = false;
@@ -277,6 +333,13 @@ namespace Earshot.Simulation
 
         private void Update()
         {
+            if (readyRoute != null && server?.Status == TaxiReplayServer.State.Connected)
+            {
+                driver.StartScenarioRoute(readyRoute, readyApproachSpeed);
+                readyRoute = null;
+                server.Begin(streamRide, SampleGps);
+            }
+
             double now = AudioSettings.dspTime;
             while (scheduled.Count > 0 && scheduled[0].Time <= now)
             {
@@ -294,8 +357,34 @@ namespace Earshot.Simulation
             }
         }
 
+        private void LateUpdate()
+        {
+            server?.Advance(AudioSettings.dspTime - audioStart);
+        }
+
+        private void OnGUI()
+        {
+            if (!streamToAndroid)
+                return;
+
+            string status = (streamError ?? server?.Error) ?? (server?.Status switch
+            {
+                TaxiReplayServer.State.Waiting => "Waiting for Android on port 5005",
+                TaxiReplayServer.State.Connected => "Android connected",
+                TaxiReplayServer.State.Streaming => $"Android connected · {server.QueuedTicks} GPS/audio pairs",
+                TaxiReplayServer.State.Finished => $"Stream complete · {server.QueuedTicks} GPS/audio pairs",
+                _ => string.Empty
+            });
+            if (!string.IsNullOrEmpty(status))
+                GUI.Box(new Rect(12, Screen.height - 44, Mathf.Min(420, Screen.width - 24), 32), status);
+        }
+
         private void ClearTimeline()
         {
+            server?.Dispose();
+            server = null;
+            readyRoute = null;
+            streamRide = null;
             scheduled.Clear();
             foreach (AudioSource source in audioSources)
             {

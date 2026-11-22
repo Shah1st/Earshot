@@ -29,6 +29,7 @@ namespace Earshot.Simulation
         public bool HasArrived { get; private set; }
         public float SpeedMetersPerSecond { get; private set; }
         public float SpeedKmh => SpeedMetersPerSecond * 3.6f;
+        public Vector3 WorldPosition => body != null ? body.position : transform.position;
         public int NextWaypointIndex { get; private set; }
         public TaxiRoutePlanner.Route ActiveRoute => route;
         public IReadOnlyList<Vector3> DrivenWaypoints => drivenWaypoints;
