@@ -1,0 +1,54 @@
+{
+ "id": "demo_3_shouting_detour",
+ "split": "demo",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 42,
+ "expected_outcome": "alert",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "demo/demo_3_shouting_detour_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 6.43,
+   "text": "P: Could you go a little faster? I'm late. D: I'm at the speed limit already, sorry."
+  },
+  {
+   "t": 11.4,
+   "clip": "demo/demo_3_shouting_detour_part2.wav",
+   "gain_db": 2,
+   "kind": "dialog",
+   "len_s": 13.39,
+   "text": "P: Are you deaf? I said drive faster! Move! D: Sir, please don't shout at me. P: Shut up and turn here! Turn right! Now! Do what I say! D: Okay! Okay, I'm turning! Please!",
+   "loud": [
+    [
+     0.29,
+     3.54
+    ],
+    [
+     6.75,
+     9.48
+    ],
+    [
+     9.63,
+     13.39
+    ]
+   ],
+   "alert_from": 0.29,
+   "expect": "alert",
+   "incident": 0
+  },
+  {
+   "t": 18.4,
+   "gps": "detour"
+  }
+ ]
+}

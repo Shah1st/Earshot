@@ -1,0 +1,55 @@
+{
+ "id": "demo_1_forced_stop",
+ "split": "demo",
+ "route": "routes/epfl_to_gare.geojson",
+ "speed_kmh": 50,
+ "duration_s": 38,
+ "expected_outcome": "alert",
+ "background": [
+  {
+   "clip": "cabin/drive_050kph_mic14.wav",
+   "gain_db": 0,
+   "loop": true,
+   "idle_clip": "cabin/drive_000kph_mic14.wav"
+  }
+ ],
+ "events": [
+  {
+   "t": 2.0,
+   "clip": "demo/demo_1_forced_stop_part1.wav",
+   "gain_db": 0,
+   "kind": "dialog",
+   "len_s": 8.08,
+   "text": "P: Evening. To the old town, please, near the cathedral. D: Sure. Should be about ten minutes at this hour."
+  },
+  {
+   "t": 13.1,
+   "clip": "demo/demo_1_forced_stop_part2.wav",
+   "gain_db": 2,
+   "kind": "dialog",
+   "len_s": 16.65,
+   "text": "P: Hey. Stop the car. Stop the car, now! D: What? Sir, we're not there yet. P: I said stop the car and get out! Get out of the car! Now! D: Okay! Okay! Please, calm down, I'm stopping!",
+   "loud": [
+    [
+     0.27,
+     4.0
+    ],
+    [
+     7.63,
+     11.95
+    ],
+    [
+     12.22,
+     16.65
+    ]
+   ],
+   "alert_from": 0.27,
+   "expect": "alert",
+   "incident": 0
+  },
+  {
+   "t": 25.8,
+   "gps": "stop"
+  }
+ ]
+}

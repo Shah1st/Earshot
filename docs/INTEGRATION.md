@@ -5,14 +5,15 @@ exactly what the app has to reproduce and what Unity has to send. Every number b
 `shared/config.json`; read it from there, do not hard code it. If the app and Python disagree on a ride,
 Python is right until we decide otherwise together.
 
-Files you need (all produced by `ml/scripts/export_demo_pack.py` into `ml/demo_pack/` and `demo_pack.zip`):
+Files you need are all in **`demo_pack/` at the repo root** (tracked in git, produced by
+`ml/scripts/export_demo_pack.py`; see `demo_pack/README.md`):
 
 | File | Used by | What |
 |---|---|---|
 | `config.json` | app | thresholds, keyword list, GPS limits, judge model and system prompt |
 | `head.json` | app | sound head: 2,048 weights + bias |
 | `models/yamnet_tfhub.tflite`, `models/yamnet_labels.txt` | app | float YAMNet (16 MB) and its 521 class names |
-| `vosk-model-small-en-us-0.15` | app | download from alphacephei.com/vosk/models (40 MB) |
+| `models/vosk-model-small-en-us-0.15/` | app | Vosk speech model (68 MB unpacked) |
 | `scenarios/*.json`, `routes/*.geojson`, `clips/` | Unity | demo rides as scenario files + the clips they use |
 | `rides/<id>.wav`, `rides/<id>.gps.jsonl` | Unity | the same rides pre rendered: one WAV + one GPS line per 0.5 s |
 | `expected/<id>.json` | both | what the Python reference decided on each demo ride (parity check) |
@@ -102,6 +103,18 @@ one line summary.
 
 While open, track per group the max score, per class the max score. The event **seals** `audio.clip_post_s` (5 s)
 after it opened and is sent to the judge.
+
+**Wordless sound, no LLM call (`config.wordless_rule`):** when a `sound` event seals and the transcript from
+5 s before it opened until now has at most `max_words` (2) words:
+
+| Condition, checked in this order | Output |
+|---|---|
+| the clear case alert was already sent for this event | summary "loud sound, no speech" (no LLM) |
+| max score of any `benign_labels` class during the event ≥ `benign_min_score` (0.2) | `dismiss` |
+| GPS `anomaly` is true | `alert` |
+| otherwise | `check_in` |
+
+Source is `rule`. All other events go to the judge.
 
 ### 2.6 Judge call (the only thing that costs tokens)
 

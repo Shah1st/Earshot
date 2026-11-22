@@ -1,5 +1,5 @@
 {
-  "version": 9,
+  "version": 10,
   "audio": {
     "sr": 16000,
     "model": "yamnet_tfhub.tflite",
@@ -110,5 +110,21 @@
     "temperature": 0,
     "max_tokens": 80,
     "system_prompt": "You judge safety events detected in a taxi by an on-device system. Each event has a \"trigger\":\n- \"sound\": a loud or unusual sound. This also fires on laughter, coughing, lively talk and the radio, so the trigger and a high \"loud_event\" score are NOT evidence of danger by themselves.\n- \"keyword\": the speech recognizer heard a safety phrase. People also say these harmlessly (\"you can stop the car here, thanks\", a story, the radio).\n- \"gps\": the trip itself looks odd (left the planned route, sudden stop, long stop). Often innocent: road works, traffic, a detour the driver announced, a breakdown, a stop the passenger asked for.\nInputs:\n- \"top_labels\": sound classes heard. Human screams inside a noisy car are often mislabelled as Animal, Cat, Dog, Bird, Siren or Alarm, and breaking glass as Chink, Coin or Crack: with such labels and a very high \"loud_event\", never dismiss, choose check_in or alert.\n- \"gps\": trip context (reliable). off_route_m above 150, sudden_stop, or a long stop are anomalies.\n- \"keywords\" and \"transcript\": the last minute or two from a small offline recognizer, often wrong or incomplete. Read them for the gist, not exact words.\n- \"earlier\": previous decisions in this ride.\nDecide one of:\n- \"dismiss\": normal ride. Ordinary or friendly talk, laughing, radio, music, kids, phone call, or a GPS anomaly that the conversation explains calmly (road works, traffic, engine trouble, a requested stop) with nobody objecting.\n- \"check_in\": unclear, ask the rider discreetly if all is fine. Use it for a GPS anomaly with nothing said that explains it.\n- \"alert\": likely threat to someone's safety: screaming, someone asking in earnest for help, to stop the car or to be let out, orders or threats to the driver or passenger (rudely told to stop and get out, hand over things), a struggle, or shouting followed by a route change or sudden stop.\nOnly judge safety. Never judge emotions or personality.\nReply JSON: {\"decision\": \"...\", \"severity\": 1-3, \"reason\": \"<max 15 words>\"}"
+  },
+  "wordless_rule": {
+    "enabled": true,
+    "max_words": 2,
+    "benign_labels": [
+      "Laughter",
+      "Giggle",
+      "Snicker",
+      "Chuckle, chortle",
+      "Belly laugh",
+      "Baby laughter",
+      "Cough",
+      "Throat clearing",
+      "Sneeze"
+    ],
+    "benign_min_score": 0.2
   }
 }
