@@ -231,7 +231,6 @@ __marimo__/
 local.properties
 # ML data, models and caches (rebuilt by ml/scripts, shared out of band)
 ml/data/
-ml/demo_pack/
 ml/results/cache/
 *.zip
 # Android / Unity (teammates' folders)

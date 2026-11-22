@@ -18,7 +18,7 @@ is in `docs/INTEGRATION.md`.
 | Evaluation + audio LLM baseline | `ml/scripts/evaluate.py`, `baseline_audio_llm.py` | done, numbers below |
 | Team demo rides (5) | `ml/scripts/make_demo.py` → `ml/data/demo/`, `shared/scenarios/demo/` | all 5 behave as intended |
 | Unity stand-in (socket server) | `ml/scripts/stream_ride.py` | written, not yet tested against the app |
-| Hand-over bundle | `ml/scripts/export_demo_pack.py` → `ml/demo_pack.zip` | done |
+| Hand-over bundle (models, config, 5 demo rides, expected outputs) | `ml/scripts/export_demo_pack.py` → `demo_pack/` (in git) | done |
 
 ## 2. How the pipeline works now (differences from the plan are marked)
 

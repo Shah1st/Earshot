@@ -16,6 +16,7 @@ summary (sound labels, Vosk transcript, GPS context) and decide: dismiss / check
 | `ml/` | ML | Python reference pipeline, data building, evaluation. `ml/earshot/` is the library, `ml/scripts/` the entry points. |
 | `android/` | Android teammate | Kotlin + Compose app (not started here). |
 | `unity/` | Unity teammate | Car scene, scenario player, socket sender (not started here). |
+| `demo_pack/` | Android, Unity | Generated hand-over bundle: models, config, the 5 demo rides, expected outputs. Rebuild with `ml/scripts/export_demo_pack.py`, never edit by hand. |
 | `docs/` | everyone | Status and integration notes. |
 
 Each component lives in its own folder so it can be cloned and launched alone on another laptop.
