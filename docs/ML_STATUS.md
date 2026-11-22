@@ -270,6 +270,41 @@ Detectors, thresholds set on tune rides:
 * Not tried: native classes and the head as two triggers together; features from an earlier YAMNet layer (the
   shipped model only exposes the final embedding).
 
+### 4.7 A head trained on real recordings only (`ml/scripts/fetch_extra.py`, `train_real_head.py`)
+
+Trained on 752 real positive clips (screams, shouts, breaking glass from FSD50K, shouted speech from CREMA-D) and
+2,856 real negative clips (speech, laughter, coughs, doors, horns, everyday sounds, music), tune split only, each
+placed in the car and mixed over real driving noise. **No acted or synthesised voice in training**, so the acted
+dialogues are a clean test for it. Weights: `shared/head_real.json`; candidate config: `shared/config_real.json`
+(threshold 0.82). The default config still uses the original head.
+
+Detector only, thresholds set on tune rides for a false open budget, test rides:
+
+| Detector | Acted dialogue incidents opened | Real sound incidents | False opens / h on test | Isolated real sounds: threats / harmless |
+|---|---|---|---|---|
+| YAMNet classes (budget 15) | 4 / 12 | 1 / 4 | 15.5 | 66% / 11% |
+| Current head (budget 15) | 9 / 12 | 3 / 4 | 20.5 | 69% / 10% |
+| Real-only head (budget 15) | 6 / 12 | 3 / 4 | 12.5 | 66% / 6% |
+| Real-only head (budget 30) | 9 / 12 | 4 / 4 | 27.5 | 76% / 15% |
+| YAMNet classes + real-only head (budget 15) | 5 / 12 | 3 / 4 | 17.0 | 83% / 8% |
+
+Full pipeline on the test split (16 incidents):
+
+| Config | Alerted | Alerted or check-in | False alerts / h | False check-ins / h | Tokens / h |
+|---|---|---|---|---|---|
+| Current head (default) | 9 | 12 | 2.0 | 7.5 | 14,159 |
+| Real-only head, threshold 0.82 | 7 | 10 | 2.0 | 2.0 | 8,505 |
+
+* The real-only head's false open rate on test matches what was set on tune (12.5 for a budget of 15); the current
+  head overshoots (20.5), a sign its tune estimate is optimistic because it trained on those voices.
+* On real sounds the two are equal or the real-only head is slightly better. On acted dialogues the current head
+  opens more (it trained on that voice).
+* The real-only head scores the acted "shouting" low: 0.56 in demo ride 1 and 0.28 in demo ride 3, where the
+  current head gives 0.96 and 0.55. With it, demo ride 1 is **missed**. Either the synthetic shouting is not
+  much like real shouting, or the current head learned the synthetic voice; both readings say the same thing:
+  results on acted audio do not predict behaviour on real voices. Live voices are the test that decides.
+* Differences of one or two incidents out of 16 are within noise.
+
 ## 5. Findings worth telling
 
 * **Native YAMNet classes are not enough in a car.** With the plan's groups and thresholds almost nothing fires
