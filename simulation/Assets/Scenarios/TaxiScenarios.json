@@ -11,13 +11,6 @@
   ],
   "scenarios": [
     {
-      "id": "demo_1_forced_stop",
-      "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
-      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_1_forced_stop", "cues": [
-        { "atSeconds": 25.8, "action": "brake_to_stop" }
-      ] }]
-    },
-    {
       "id": "demo_2_roadworks",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
       "drivingRoute": ["pickup", "first_block", "market", "fork_approach", "northwest", "north_cross", "destination"],
@@ -37,13 +30,6 @@
       "id": "demo_4_normal",
       "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
       "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_4_normal" }]
-    },
-    {
-      "id": "demo_5_engine_stall",
-      "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
-      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_5_engine_stall", "cues": [
-        { "atSeconds": 10.2, "action": "brake_to_stop" }
-      ] }]
     },
     {
       "id": "demo_6_abduction_rec",
