@@ -10,6 +10,7 @@
       clips/...                         only the clips the demo scenarios use (if Unity mixes itself)
       rides/<id>.wav + <id>.gps.jsonl   the same rides pre rendered (simplest: play the wav, replay the GPS lines)
       expected/<id>.json                what the Python reference decided on each ride (output format + parity check)
+      expected_baseline/<id>.json       what the always-listening audio LLM answered per 30 s chunk, with tokens
 
     uv run python scripts/evaluate.py --split demo --tag demo     # refresh the expected outputs first
     uv run python scripts/export_demo_pack.py
@@ -40,11 +41,12 @@ Everything needed to run the five demo rides without the Python environment. Gen
 | `rides/<id>.gps.jsonl` | Unity | one line per 0.5 s: `{{"t", "lat", "lon", "speed_kmh"}}`, send with the audio chunk of the same `t` |
 | `scenarios/<id>.json`, `routes/`, `clips/` | Unity | the same rides as scenario files, if Unity mixes and drives itself |
 | `expected/<id>.json` | both | decisions of the Python reference: the output format and the parity target |
+| `expected_baseline/<id>.json` | app | what the always-listening audio LLM answered per chunk, with its token usage (comparison button) |
 
 ## Rides
 
-| Ride | Length | Expected |
-|---|---|---|
+| Ride | Length | Earshot decides | Earshot tokens | Audio LLM says, per 30 s chunk | Audio LLM tokens |
+|---|---|---|---|---|---|
 {rides}
 
 ## Output format (`expected/<id>.json`)
@@ -68,7 +70,8 @@ A list of decisions, in time order:
 
 * YAMNet: Apache 2.0 (Google). Vosk model: Apache 2.0 (Alpha Cephei).
 * Driving noise in the rides and `clips/cabin/`: Cerence In-Car McVAMPIRE dataset, CC BY 4.0 (Mueller and Wolff, 2024).
-* Voices: scripted by the team and synthesised, placed in the car with McVAMPIRE impulse responses.
+* Voices: scripted by the team and synthesised; rides ending in `_rec` are the team's own recorded voices.
+  All are placed in the car with McVAMPIRE impulse responses.
 * Route: OpenStreetMap contributors (ODbL), via OSRM.
 """
 
@@ -76,19 +79,24 @@ A list of decisions, in time order:
 def main() -> None:
     cfg = load_config()
     shutil.rmtree(PACK, ignore_errors=True)
-    for d in ("models", "scenarios", "routes", "rides", "expected"):
+    for d in ("models", "scenarios", "routes", "rides", "expected", "expected_baseline"):
         (PACK / d).mkdir(parents=True)
     shutil.copy(REPO / "shared" / "config.json", PACK)
     shutil.copy(REPO / "shared" / cfg["head"]["file"], PACK)
     shutil.copy(MODELS / cfg["audio"]["model"], PACK / "models")
     shutil.copy(MODELS / "yamnet_labels.txt", PACK / "models")
     shutil.copytree(MODELS / cfg["asr"]["model"], PACK / "models" / cfg["asr"]["model"])
-    expected = {}
-    if (RESULTS / "demo.json").exists():
-        expected = {r["id"]: r["outputs"] for r in json.loads((RESULTS / "demo.json").read_text(encoding="utf-8"))["rides"]}
+    expected = {}  # demo = the five synthesised scenes, demo_recorded = scenes built from the team's own voices
+    for name in ("demo", "demo_recorded"):
+        if (RESULTS / f"{name}.json").exists():
+            expected.update({r["id"]: r["outputs"] for r in json.loads((RESULTS / f"{name}.json").read_text(encoding="utf-8"))["rides"]})
+    baseline = {}
+    for name in ("demo", "demo_recorded"):
+        if (RESULTS / f"baseline_audio_{name}.json").exists():
+            baseline.update({r["id"]: r["chunks"] for r in json.loads((RESULTS / f"baseline_audio_{name}.json").read_text(encoding="utf-8"))["rides"]})
     det = Detector(cfg)
     rows = []
-    for path in scenario_paths("demo"):
+    for path in scenario_paths("demo") + scenario_paths("demo_recorded"):
         ride = load_ride(path, det)
         scn = ride["scn"]
         shutil.copy(path, PACK / "scenarios")
@@ -102,8 +110,13 @@ def main() -> None:
             shutil.copy(RIDES / f"{scn['id']}{ext}", PACK / "rides")
         outs = expected.get(scn["id"], [])
         (PACK / "expected" / f"{scn['id']}.json").write_text(json.dumps(outs, indent=1), encoding="utf-8")
+        chunks = baseline.get(scn["id"], [])
+        (PACK / "expected_baseline" / f"{scn['id']}.json").write_text(json.dumps(chunks, indent=1), encoding="utf-8")
+        ours_tok = sum(o["usage"]["total_tokens"] for o in outs if o.get("usage"))
+        base_tok = sum(c["usage"]["total_tokens"] for c in chunks)
+        base_what = ", ".join(c["decision"] for c in chunks) or "not run"
         what = ", ".join(f"{o['decision']} at {o['t']} s" for o in outs if o["type"] == "decision") or "nothing"
-        rows.append(f"| `{scn['id']}` | {scn['duration_s']} s | {what} |")
+        rows.append(f"| `{scn['id']}` | {scn['duration_s']} s | {what} | {ours_tok} | {base_what} | {base_tok} |")
     (PACK / "README.md").write_text(README.format(version=cfg["version"], rides="\n".join(rows)), encoding="utf-8")
     size = sum(f.stat().st_size for f in PACK.rglob("*") if f.is_file()) / 1e6
     print(f"{PACK} written ({size:.0f} MB)")

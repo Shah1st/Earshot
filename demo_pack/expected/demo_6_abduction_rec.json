@@ -1,0 +1,43 @@
+[
+ {
+  "t": 23.0,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Passenger explicitly and repeatedly demands to be let out and asks for help.",
+  "event_id": 1,
+  "event": {
+   "t": 18.0,
+   "trigger": "keyword",
+   "groups": {
+    "loud_event": 0.99
+   },
+   "duration_s": 2.5,
+   "top_labels": {
+    "Speech": 1.0
+   },
+   "gps": {
+    "speed_kmh": 50.0,
+    "off_route_m": 174,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "stop the car",
+    "let me out",
+    "be quiet",
+    "help me",
+    "help"
+   ],
+   "transcript": "hi like street will skill this is not doing they're going what no stop the car let me out me out be quiet help someone to help me help"
+  },
+  "usage": {
+   "prompt_tokens": 624,
+   "completion_tokens": 31,
+   "total_tokens": 655,
+   "cost": 0.0002025,
+   "audio_tokens": 0
+  }
+ }
+]

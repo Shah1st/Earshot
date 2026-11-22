@@ -1,7 +1,8 @@
 """Continuous on-device speech recognition with Vosk (0 LLM tokens).
 
 The recogniser runs on every 0.5 s chunk and gives the pipeline two things:
-  * a rolling transcript kept in memory as text only (the judge gets the last 45 to 120 s of it);
+  * a rolling transcript kept in memory as text only: at most the last 120 s (asr.gps_context_s), older words
+    are dropped; the judge gets the last 45 s for sound events and the last 120 s for GPS events;
   * keyword triggers: a safety phrase appearing in the transcript opens an event even when nobody shouts.
 
 Keywords are phrases matched in the FREE transcript. The grammar limited pass from the first plan was
@@ -34,8 +35,11 @@ class StreamAsr:
 
     _models: dict = {}
 
-    def __init__(self, cfg: dict):
+    def __init__(self, cfg: dict, keep_all: bool = False):
+        """keep_all: never forget words. Only for offline recording of a whole ride (RecordedAsr); the phone keeps 120 s."""
         from vosk import KaldiRecognizer, Model, SetLogLevel
+
+        self.keep_all = keep_all
 
         SetLogLevel(-1)
         self.cfg = cfg["asr"]
@@ -59,6 +63,9 @@ class StreamAsr:
     def _take(self, result: dict) -> list[str]:
         words = [w for w in result.get("result", []) if w["conf"] >= self.cfg["min_word_conf"]]
         self.words += [(w["word"], w["start"], w["end"]) for w in words]
+        if self.words and not self.keep_all:  # rolling memory: forget everything older than the longest context the judge can be given
+            keep = self.words[-1][2] - max(self.cfg["context_s"], self.cfg["gps_context_s"])
+            self.words = [w for w in self.words if w[2] > keep]
         hits = self._new_hits(" ".join(w["word"] for w in words))
         self.partial, self.fired = "", {}
         return hits
@@ -88,7 +95,7 @@ class RecordedAsr:
 
     @staticmethod
     def record(cfg: dict, audio: np.ndarray) -> dict:
-        asr, hop, hits = StreamAsr(cfg), int(cfg["audio"]["chunk_s"] * SR), {}
+        asr, hop, hits = StreamAsr(cfg, keep_all=True), int(cfg["audio"]["chunk_s"] * SR), {}
         for i in range(len(audio) // hop):
             h = asr.feed((i + 1) * cfg["audio"]["chunk_s"], audio[i * hop:(i + 1) * hop])
             if h:
