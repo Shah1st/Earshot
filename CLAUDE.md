@@ -7,6 +7,7 @@ summary (sound labels, Vosk transcript, GPS context) and decide: dismiss / check
 * Product and demo spec: `earshot_baseline_plan.md` (source of truth for the design).
 * What is built, what was found, what is next: `docs/ML_STATUS.md`. **Read it before working on `ml/`.**
 * Contract for the Android and Unity teammates: `docs/INTEGRATION.md`.
+* Task oriented how-to for the app side: `docs/APP_HOWTO.md`. For the jury: `docs/EXPERIMENTS.md`.
 
 ## Layout
 

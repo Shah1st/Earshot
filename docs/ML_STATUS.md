@@ -29,10 +29,10 @@ is in `docs/INTEGRATION.md`.
    is the default. The MediaPipe `yamnet.tflite` has no embedding output, so the app must use the float model with
    the LiteRT interpreter (16 MB instead of 4 MB).
 2. **Speech:** Vosk small model runs **continuously** on device and keeps a rolling transcript as text.
-   A safety phrase in it can open an event (`keyword` trigger), but this is **switched off by default**
-   (`asr.keyword_trigger: false`, since config v12) after the ablation in 4.4: it added 2 of 16 incidents for
-   most of the false alerts and half of the tokens. The transcript is still given to the judge for every event.
-   Consequence: a calmly spoken threat with no loud sound and no GPS anomaly is not examined at all.
+   A safety phrase in it opens an event (`keyword` trigger, 52 phrases in `asr.keywords`: pleas, orders,
+   threats, weapons). It was switched off after the ablation in 4.4 and switched back on with a wider list by a
+   team decision: catching more matters more than radio false alarms. The transcript is given to the judge for
+   every event either way. A calm threat is examined only if one of the phrases is recognised.
    *Changed:* the plan transcribed only the clip around a sound event. That cannot catch a calm threat
    ("stop the car and get out") or explain a detour, which the team's demo cases need. Cost: more CPU on the phone,
    still 0 tokens. The plan's grammar limited keyword pass was dropped (it hallucinates, see 5).
@@ -100,22 +100,36 @@ Config version 8 for v2 (`shared/config.json`), same prompt and triggers for v1 
 All token and cost figures are the `usage` values returned by OpenRouter. Raw outputs: `ml/results/*.json`
 (git ignored; rebuild with `evaluate.py` and `baseline_audio_llm.py`, LLM replies are cached).
 
-### 4.0 Current system (config v13: keyword trigger off, wordless sound rule on)
+### 4.0 Current system (config v16: wide phrase trigger on, wordless sound rule, silent GPS rule)
 
 Test split, 24 rides, 2.0 ride hours, 16 incidents:
 
-| System | Alerted | Alerted or rider check-in | False alerts / h | False check-ins / h | LLM calls / h | Tokens / h |
+| System | Alerted | Alerted or check-in | False alerts / h | False check-ins / h | LLM calls / h | Tokens / h |
 |---|---|---|---|---|---|---|
 | Audio LLM hears everything | 16 / 16 | 16 / 16 | 16.5 | 0.5 | 144 | 126,662 |
-| **Ours, current** | 9 / 16 | 12 / 16 | 2.0 | 7.5 | 19.5 | 14,159 |
+| **Ours, current** (wide phrase trigger) | 13 / 16 | 16 / 16 | 13.5 | 7.0 | 50 | 36,357 |
+| Ours, frugal setting (phrase trigger off, config v13) | 9 / 16 | 12 / 16 | 2.0 | 7.5 | 19.5 | 14,159 |
 
-* About 9 times fewer tokens than the audio LLM on these busy rides, no audio uploaded, 6 of 24 rides cost 0 tokens.
-* Incidents with a spoken threat: 8 / 12 alerted. Incidents made only of real recorded sounds: 4 / 4 surfaced
-  (1 alert, 3 check-ins); before the rule the text judge dismissed most of these.
-* The price of the rule is check-ins on harmless loud sounds: 7.5 per ride hour here, where a sound occurs every
-  8 to 20 s.
-* Tune split for comparison: 12 / 20 alerted, 18 / 20 alerted or checked in, 1.0 false alerts / h, 5.0 false
-  check-ins / h, 12,306 tokens / h.
+* Current: about 3.5 times fewer tokens than the audio LLM, no audio uploaded, every incident reaches a human.
+  All 12 spoken threats are alerted; of the 4 incidents made only of real recorded sounds, 1 is alerted and 3 become
+  check-ins.
+* The team chose recall over false alarms: the phrase trigger costs false alerts (21 of the 27 quote one radio
+  drama line) and tokens. The frugal row is the same system with `asr.keyword_trigger: false`.
+* No test ride costs 0 tokens with the phrase trigger on (these rides have an event every 8 to 20 s); 6 of 24 did in
+  the frugal setting.
+* Tune split, current config: 13 / 20 alerted, 19 / 20 alerted or checked in, 1.0 false alerts / h, 5.0 false
+  check-ins / h, 19,388 tokens / h. The tune radio decoys do not include the radio drama line.
+* Tried and removed: re-examining an event right after a non-alert verdict when triggers continue. Same 13 / 16,
+  28% more tokens.
+* Measurement pitfall, fixed: for a few hours the offline replay of the speech recogniser kept only the last two
+  minutes of each ride, so the judge received empty transcripts on five minute rides. Result files written with
+  config v14 or v15 before the fix are invalid and were discarded; nothing from them is quoted here. Rides under
+  two minutes (demo, recorded) were not affected.
+* Team recordings (`ml/data/recorded/`, built with `make_recorded_demo.py`): two scenes spoken by the team, an
+  abduction with screaming and a quiet knife threat, placed in the car with driving noise. Both alert (at 23.0 s
+  and 21.0 s), also with the GPS events removed, through the phrase trigger. The sound head did not separate the
+  screaming from the quiet scene (0.99 vs 0.97; the real-only head 0.35 vs 0.40); the words did the work. Two
+  recordings, so a hint only.
 
 Sections 4.1 to 4.5 are the earlier configurations and the experiments that led here.
 
@@ -269,6 +283,41 @@ Detectors, thresholds set on tune rides:
   the rule uses this to skip the check-in.
 * Not tried: native classes and the head as two triggers together; features from an earlier YAMNet layer (the
   shipped model only exposes the final embedding).
+
+### 4.7 A head trained on real recordings only (`ml/scripts/fetch_extra.py`, `train_real_head.py`)
+
+Trained on 752 real positive clips (screams, shouts, breaking glass from FSD50K, shouted speech from CREMA-D) and
+2,856 real negative clips (speech, laughter, coughs, doors, horns, everyday sounds, music), tune split only, each
+placed in the car and mixed over real driving noise. **No acted or synthesised voice in training**, so the acted
+dialogues are a clean test for it. Weights: `shared/head_real.json`; candidate config: `shared/config_real.json`
+(threshold 0.82). The default config still uses the original head.
+
+Detector only, thresholds set on tune rides for a false open budget, test rides:
+
+| Detector | Acted dialogue incidents opened | Real sound incidents | False opens / h on test | Isolated real sounds: threats / harmless |
+|---|---|---|---|---|
+| YAMNet classes (budget 15) | 4 / 12 | 1 / 4 | 15.5 | 66% / 11% |
+| Current head (budget 15) | 9 / 12 | 3 / 4 | 20.5 | 69% / 10% |
+| Real-only head (budget 15) | 6 / 12 | 3 / 4 | 12.5 | 66% / 6% |
+| Real-only head (budget 30) | 9 / 12 | 4 / 4 | 27.5 | 76% / 15% |
+| YAMNet classes + real-only head (budget 15) | 5 / 12 | 3 / 4 | 17.0 | 83% / 8% |
+
+Full pipeline on the test split (16 incidents):
+
+| Config | Alerted | Alerted or check-in | False alerts / h | False check-ins / h | Tokens / h |
+|---|---|---|---|---|---|
+| Current head (default) | 9 | 12 | 2.0 | 7.5 | 14,159 |
+| Real-only head, threshold 0.82 | 7 | 10 | 2.0 | 2.0 | 8,505 |
+
+* The real-only head's false open rate on test matches what was set on tune (12.5 for a budget of 15); the current
+  head overshoots (20.5), a sign its tune estimate is optimistic because it trained on those voices.
+* On real sounds the two are equal or the real-only head is slightly better. On acted dialogues the current head
+  opens more (it trained on that voice).
+* The real-only head scores the acted "shouting" low: 0.56 in demo ride 1 and 0.28 in demo ride 3, where the
+  current head gives 0.96 and 0.55. With it, demo ride 1 is **missed**. Either the synthetic shouting is not
+  much like real shouting, or the current head learned the synthetic voice; both readings say the same thing:
+  results on acted audio do not predict behaviour on real voices. Live voices are the test that decides.
+* Differences of one or two incidents out of 16 are within noise.
 
 ## 5. Findings worth telling
 

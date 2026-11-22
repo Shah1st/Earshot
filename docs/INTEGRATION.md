@@ -95,7 +95,8 @@ An event **opens** when no event is open, the last trigger was ≥ `event.cooldo
 | `keyword` | keyword trigger fires (2.3); only when `asr.keyword_trigger` is true (off by default) |
 | `gps: <flag text>` | a GPS flag turns on (2.4) |
 
-Any sound or keyword trigger refreshes the cooldown timer (so a long scream is one event).
+The cooldown counts from the moment an event **opened**; triggers do not extend it. So while trouble continues, a
+new event opens every 10 s and is judged with the newer transcript.
 
 **Clear case, no LLM decision:** on a chunk where the sound trigger fires with `p ≥ loud_event.high` and
 `anomaly` is true → emit `alert` immediately (once per event). The LLM call at sealing then only provides the
@@ -115,6 +116,9 @@ after it opened and is sent to the judge.
 | otherwise | `check_in` |
 
 Source is `rule`. All other events go to the judge.
+
+**Silent GPS anomaly, no LLM call (`gps.silent_check_in`):** when a `gps` event seals and its 120 s transcript has
+at most `wordless_rule.max_words` (2) words, output `check_in` with source `rule`.
 
 ### 2.6 Judge call (the only thing that costs tokens)
 
@@ -138,7 +142,27 @@ System message = `judge.system_prompt`. User message = this JSON, compact:
 * Show `usage.total_tokens` in the token counter. Measured: about 720 tokens per judged event.
 * Operator Q&A: one more call with that event's JSON as context and the operator's question (see `judge.py`).
 
-### 2.7 What the UI gets
+### 2.7 Comparison button: the same ride through an always-listening audio LLM
+
+Everything is in `config.baseline`; expected answers and token counts per demo ride are in
+`demo_pack/expected_baseline/<id>.json` (show these if you do not want to spend tokens live).
+
+* Chunking: every `hop_s` (25 s) send the last `chunk_s` (30 s) of ride audio, so chunks start at 0, 25, 50 ... s and
+  overlap by 5 s. Live: first request when 30 s have arrived, then every 25 s; at ride end send the unfinished chunk
+  if it starts at least `min_tail_s` (5 s) before the end.
+* Request: same endpoint as the judge, model `baseline.model`, `temperature 0`, `max_tokens` 80,
+  `response_format {"type":"json_object"}`, `usage {"include": true}`, one user message with two parts:
+  `{"type":"text","text": baseline.prompt}` and
+  `{"type":"input_audio","input_audio":{"data":"<base64 of a 16 kHz mono PCM16 WAV file>","format":"wav"}}`.
+* Reply: `{"decision": "dismiss" | "check_in" | "alert", "reason": "..."}`; add `usage.total_tokens` to its counter.
+  Measured: about 890 tokens for a full 30 s chunk.
+* Show both counters side by side: Earshot's judge tokens against the audio LLM's tokens for the same ride.
+
+### 2.8 What the UI gets
+
+**Demo mapping (decided with the team):** everything goes to the operator screen, no rider prompt. `alert` = red
+card, `check_in` = amber card ("needs a look"), `dismiss` = grey line in the log. The pipeline output is unchanged;
+this is only how the app shows it.
 
 Each decision: time, `dismiss` (grey) / `check_in` (ask the rider) / `alert` (silent operator alert), source
 (`rule`, `llm`), one line reason, tokens used. For the parity check, write them as JSON lines and compare with

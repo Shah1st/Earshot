@@ -1,0 +1,39 @@
+[
+ {
+  "t": 21.0,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Transcript indicates a robbery with explicit demands for money and phone.",
+  "event_id": 1,
+  "event": {
+   "t": 16.0,
+   "trigger": "gps: sudden stop",
+   "groups": {
+    "loud_event": 0.97
+   },
+   "duration_s": 0.5,
+   "top_labels": {
+    "Speech": 0.99
+   },
+   "gps": {
+    "speed_kmh": 0.0,
+    "off_route_m": 2,
+    "sudden_stop": true,
+    "stopped_s": 3.5
+   },
+   "keywords": [
+    "don't press anything"
+   ],
+   "transcript": "just to go with sticks sure no problem over get humans money and your phone and don't press anything they can they can"
+  },
+  "usage": {
+   "prompt_tokens": 609,
+   "completion_tokens": 29,
+   "total_tokens": 638,
+   "cost": 0.00019575,
+   "audio_tokens": 0
+  }
+ }
+]

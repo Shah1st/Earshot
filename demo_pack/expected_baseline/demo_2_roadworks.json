@@ -1,0 +1,28 @@
+[
+ {
+  "a": 0,
+  "b": 30,
+  "decision": "dismiss",
+  "reason": "The audio contains a normal conversation between a passenger and a driver.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 24,
+   "total_tokens": 891,
+   "cost": 0.00044025,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 25,
+  "b": 55,
+  "decision": "dismiss",
+  "reason": "The audio contains a normal conversation between a passenger and a driver.",
+  "usage": {
+   "prompt_tokens": 642,
+   "completion_tokens": 24,
+   "total_tokens": 666,
+   "cost": 0.00032775,
+   "audio_tokens": 525
+  }
+ }
+]

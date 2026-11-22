@@ -341,4 +341,4 @@ local.properties
 
 # Generated ML sound experiments
 /shared/scenarios/sound_*/
-/shared/head_real.json
+/shared/scenarios/demo_recorded/
