@@ -70,7 +70,8 @@ A list of decisions, in time order:
 
 * YAMNet: Apache 2.0 (Google). Vosk model: Apache 2.0 (Alpha Cephei).
 * Driving noise in the rides and `clips/cabin/`: Cerence In-Car McVAMPIRE dataset, CC BY 4.0 (Mueller and Wolff, 2024).
-* Voices: scripted by the team and synthesised, placed in the car with McVAMPIRE impulse responses.
+* Voices: scripted by the team and synthesised; rides ending in `_rec` are the team's own recorded voices.
+  All are placed in the car with McVAMPIRE impulse responses.
 * Route: OpenStreetMap contributors (ODbL), via OSRM.
 """
 
@@ -85,15 +86,17 @@ def main() -> None:
     shutil.copy(MODELS / cfg["audio"]["model"], PACK / "models")
     shutil.copy(MODELS / "yamnet_labels.txt", PACK / "models")
     shutil.copytree(MODELS / cfg["asr"]["model"], PACK / "models" / cfg["asr"]["model"])
-    expected = {}
-    if (RESULTS / "demo.json").exists():
-        expected = {r["id"]: r["outputs"] for r in json.loads((RESULTS / "demo.json").read_text(encoding="utf-8"))["rides"]}
+    expected = {}  # demo = the five synthesised scenes, demo_recorded = scenes built from the team's own voices
+    for name in ("demo", "demo_recorded"):
+        if (RESULTS / f"{name}.json").exists():
+            expected.update({r["id"]: r["outputs"] for r in json.loads((RESULTS / f"{name}.json").read_text(encoding="utf-8"))["rides"]})
     baseline = {}
-    if (RESULTS / "baseline_audio_demo.json").exists():
-        baseline = {r["id"]: r["chunks"] for r in json.loads((RESULTS / "baseline_audio_demo.json").read_text(encoding="utf-8"))["rides"]}
+    for name in ("demo", "demo_recorded"):
+        if (RESULTS / f"baseline_audio_{name}.json").exists():
+            baseline.update({r["id"]: r["chunks"] for r in json.loads((RESULTS / f"baseline_audio_{name}.json").read_text(encoding="utf-8"))["rides"]})
     det = Detector(cfg)
     rows = []
-    for path in scenario_paths("demo"):
+    for path in scenario_paths("demo") + scenario_paths("demo_recorded"):
         ride = load_ride(path, det)
         scn = ride["scn"]
         shutil.copy(path, PACK / "scenarios")
