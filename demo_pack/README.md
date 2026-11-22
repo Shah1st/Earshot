@@ -5,7 +5,7 @@ Everything needed to run the five demo rides without the Python environment. Gen
 
 | Path | For | What |
 |---|---|---|
-| `config.json` | app | thresholds, GPS limits, wordless sound rule, judge model and system prompt (version 12) |
+| `config.json` | app | thresholds, GPS limits, wordless sound rule, judge model and system prompt (version 13) |
 | `head.json` | app | sound head: 2,048 weights + bias |
 | `models/yamnet_tfhub.tflite` | app | float YAMNet; outputs 521 class scores and a 1,024 value embedding |
 | `models/yamnet_labels.txt` | app | class names, line i = class i |
@@ -14,16 +14,17 @@ Everything needed to run the five demo rides without the Python environment. Gen
 | `rides/<id>.gps.jsonl` | Unity | one line per 0.5 s: `{"t", "lat", "lon", "speed_kmh"}`, send with the audio chunk of the same `t` |
 | `scenarios/<id>.json`, `routes/`, `clips/` | Unity | the same rides as scenario files, if Unity mixes and drives itself |
 | `expected/<id>.json` | both | decisions of the Python reference: the output format and the parity target |
+| `expected_baseline/<id>.json` | app | what the always-listening audio LLM answered per chunk, with its token usage (comparison button) |
 
 ## Rides
 
-| Ride | Length | Expected |
-|---|---|---|
-| `demo_1_forced_stop` | 38 s | alert at 29.0 s |
-| `demo_2_roadworks` | 46 s | dismiss at 31.0 s |
-| `demo_3_shouting_detour` | 42 s | alert at 38.5 s |
-| `demo_4_normal` | 33 s | nothing |
-| `demo_5_engine_stall` | 57 s | dismiss at 53.5 s |
+| Ride | Length | Earshot decides | Earshot tokens | Audio LLM says, per 30 s chunk | Audio LLM tokens |
+|---|---|---|---|---|---|
+| `demo_1_forced_stop` | 38 s | alert at 29.0 s | 681 | alert, alert | 1359 |
+| `demo_2_roadworks` | 46 s | dismiss at 31.0 s | 690 | dismiss, dismiss | 1557 |
+| `demo_3_shouting_detour` | 42 s | alert at 38.5 s | 703 | alert, dismiss | 1456 |
+| `demo_4_normal` | 33 s | nothing | 0 | dismiss, dismiss | 1231 |
+| `demo_5_engine_stall` | 57 s | dismiss at 53.5 s | 686 | check_in, dismiss, dismiss | 2102 |
 
 ## Output format (`expected/<id>.json`)
 

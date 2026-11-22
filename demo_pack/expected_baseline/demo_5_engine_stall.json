@@ -1,0 +1,41 @@
+[
+ {
+  "a": 0,
+  "b": 30,
+  "decision": "check_in",
+  "reason": "The vehicle engine cut out, causing a potential safety concern.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 25,
+   "total_tokens": 892,
+   "cost": 0.00044175,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 25,
+  "b": 55,
+  "decision": "dismiss",
+  "reason": "The conversation is calm and polite, indicating a normal passenger-driver interaction.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 26,
+   "total_tokens": 893,
+   "cost": 0.00044325,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 50,
+  "b": 80,
+  "decision": "dismiss",
+  "reason": "The audio clip contains no sound, indicating a normal, quiet ride.",
+  "usage": {
+   "prompt_tokens": 292,
+   "completion_tokens": 25,
+   "total_tokens": 317,
+   "cost": 0.00015425,
+   "audio_tokens": 175
+  }
+ }
+]
