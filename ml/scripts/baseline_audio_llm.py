@@ -28,13 +28,14 @@ PROMPT = ("You monitor the audio of a taxi ride for passenger and driver safety.
           "Only judge safety. Reply JSON: {\"decision\": \"...\", \"reason\": \"<max 15 words>\"}")
 
 
-def judge_chunk(model: str, audio, a: float) -> dict:
+def judge_chunk(base: dict, audio, a: float) -> dict:
+    model = base["model"]
     buf = io.BytesIO()
     sf.write(buf, audio[int(a * SR): int((a + CHUNK_S) * SR)], SR, format="WAV", subtype="PCM_16")
     res = chat([{"role": "user", "content": [
-        {"type": "text", "text": PROMPT},
+        {"type": "text", "text": base["prompt"]},
         {"type": "input_audio", "input_audio": {"data": base64.b64encode(buf.getvalue()).decode(), "format": "wav"}}]}],
-        model=model, max_tokens=80, tag="baseline_audio")
+        model=model, max_tokens=base["max_tokens"], tag="baseline_audio")
     out = parse_json(res["text"])
     return {"a": a, "b": a + CHUNK_S, "decision": out.get("decision", "check_in"), "reason": out.get("reason", ""),
             "usage": res["usage"]}
@@ -45,11 +46,13 @@ def main() -> None:
     ap.add_argument("--split", default="test")
     ap.add_argument("--limit", type=int, default=None, help="only the first N rides (cheap smoke test)")
     args = ap.parse_args()
-    model = load_config()["judge"]["model"]
+    base = load_config()["baseline"]  # shared with the app's comparison button
+    model = base["model"]
+    assert (base["chunk_s"], base["hop_s"], base["prompt"]) == (CHUNK_S, HOP_S, PROMPT)
     rides = [load_ride(p) for p in scenario_paths(args.split)[: args.limit]]
     jobs = [(r, a) for r in rides for a in range(0, int(r["scn"]["duration_s"]) - 5, HOP_S)]
     with ThreadPoolExecutor(6) as ex:
-        chunks = list(ex.map(lambda j: judge_chunk(model, j[0]["audio"], j[1]), jobs))
+        chunks = list(ex.map(lambda j: judge_chunk(base, j[0]["audio"], j[1]), jobs))
 
     hours = sum(r["scn"]["duration_s"] for r in rides) / 3600
     n_inc = hit = hit_any = false_alerts = false_checkins = tokens = 0
