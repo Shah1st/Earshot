@@ -95,7 +95,8 @@ An event **opens** when no event is open, the last trigger was ≥ `event.cooldo
 | `keyword` | keyword trigger fires (2.3); only when `asr.keyword_trigger` is true (off by default) |
 | `gps: <flag text>` | a GPS flag turns on (2.4) |
 
-Any sound or keyword trigger refreshes the cooldown timer (so a long scream is one event).
+The cooldown counts from the moment an event **opened**; triggers do not extend it. So while trouble continues, a
+new event opens every 10 s and is judged with the newer transcript.
 
 **Clear case, no LLM decision:** on a chunk where the sound trigger fires with `p ≥ loud_event.high` and
 `anomaly` is true → emit `alert` immediately (once per event). The LLM call at sealing then only provides the

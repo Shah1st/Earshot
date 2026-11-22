@@ -52,7 +52,9 @@ the car is. No audio is sent.
 The transcript nearly doubles what we catch. Waking the judge on phrases added two more incidents but also most
 of the false alerts: a radio drama where an actress screams "Help me! Call the police!" is, as text, a real plea.
 
-*What we took from it:* the transcript is the heart of the system. We switched the phrase trigger off.
+*What we took from it:* the transcript is the heart of the system. The phrase trigger is a dial between catching
+more and crying wolf. We first switched it off; later we turned it back on with a wider list, because for a
+safety product a missed threat is worse than a false alarm (see 5).
 
 ## 4. What about a scream with no words?
 
@@ -77,14 +79,19 @@ We ran the alternative for real: the same model receiving every 30 seconds of ev
 | System | Incidents alerted | Alerted or rider asked | False alerts per hour | Tokens per hour | Audio leaving the phone |
 |---|---|---|---|---|---|
 | AI hears the whole ride | 16 of 16 | 16 of 16 | 16.5 | 126,662 | all of it |
-| Earshot | 9 of 16 | 12 of 16 | 2.0 | 14,159 | none |
+| Earshot, as we run it (wide phrase trigger) | 13 of 16 | 16 of 16 | 13.5 | 36,357 | none |
+| Earshot, frugal setting (phrase trigger off) | 9 of 16 | 12 of 16 | 2.0 | 14,159 | none |
 
-About nine times fewer tokens, eight times fewer false alerts, and nothing uploaded. It also catches less: the
-always-listening model missed nothing. Our rides are deliberately busy, with something happening every 8 to 20
-seconds; a quiet ride costs Earshot zero, and a quarter of the test rides did.
+As we run it: three and a half times fewer tokens, nothing uploaded, and every incident reaches a human (13 as
+alerts, 3 as "needs a look"). False alerts are about as frequent as with the always-listening model, and most of
+them are one radio drama line. In the frugal setting it is nine times cheaper with eight times fewer false alerts,
+and catches less.
 
-*What we took from it:* the saving is real but it is "several times", not "a thousand times", and it is bought
-with some recall. Cost follows events, not minutes.
+Our rides are deliberately busy, with something happening every 8 to 20 seconds. A ride where nothing happens
+costs Earshot zero tokens; the always-listening model pays for every second regardless.
+
+*What we took from it:* the saving is real but it is "several times", not "a thousand times". Cost follows
+events, not minutes, and one setting moves the system between cheaper and safer.
 
 ## 6. Are we fooling ourselves with our own generated voices?
 
@@ -96,8 +103,12 @@ On real sounds the two were equal. On the performed dialogues the real-only vers
 8), and it found the synthetic "shouting" much less convincing: in one demo scene it scored 0.56 where the
 original scored 0.96, and that scene was missed.
 
-*What we took from it:* numbers on performed audio do not tell us how the system behaves on real people. That is
-why we also test it with our own voices.
+So we recorded two scenes ourselves: an abduction with screaming, and a robbery at knifepoint where nobody raises
+their voice. Both raised an alert, even with the GPS clues removed. But it was the words that did it: the sound
+layer gave our screaming and our quiet scene almost the same score.
+
+*What we took from it:* numbers on performed audio do not tell us how the system behaves on real people, and on
+real voices the transcript matters even more than we thought. Two recordings are a hint, not a result.
 
 ## 7. Five situations
 
@@ -111,13 +122,14 @@ Short scenes written to cover cases the numbers cannot show:
 | Normal ride | ordinary chat | nothing, zero tokens |
 | Engine stall | engine cuts out, driver explains, long stop | dismissed: "minor mechanical issue" |
 
-Across all five, Earshot used 2,760 tokens and the always-listening model 7,705. These scenes were written by us
+Across all five, Earshot used 3,405 tokens and the always-listening model 7,705. These scenes were written by us
 after the system existed, so they show what it is meant to do, not an independent test. Without the transcript
 (experiment 3) scenes two, three and five become indistinguishable.
 
 ## What we do not claim
 
-* That it catches everything. A calm threat on a normal route, with no raised voice, is not examined at all.
+* That it catches everything. A calm threat on a normal route is examined only if the recogniser picks up one of
+  our listed phrases through the car noise.
 * That the radio is solved. Dramatic speech from the car speakers can still raise a false alert.
 * That these numbers hold on real rides. They are measured on a small benchmark with performed conversations.
 
