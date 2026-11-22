@@ -96,7 +96,7 @@ def score_rides(results: list[tuple[dict, list[dict]]], within_s: float = 10.0) 
             elif not inside(o["t"]):
                 false_alerts += o["decision"] == "alert"
                 false_checkins += o["decision"] == "check_in"
-                if o["source"] == "llm":
+                if o["source"] in ("llm", "rule") and o["event"]:
                     judged_benign += 1
                     dismissed += o["decision"] == "dismiss"
         for o in outs:

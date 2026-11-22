@@ -338,3 +338,7 @@ local.properties
 /emulator/captures/
 /emulator/**/.externalNativeBuild/
 /emulator/**/.cxx/
+
+# Generated ML sound experiments
+/shared/scenarios/sound_*/
+/shared/head_real.json

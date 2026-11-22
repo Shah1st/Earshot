@@ -1,0 +1,41 @@
+[
+ {
+  "t": 31.0,
+  "type": "decision",
+  "decision": "dismiss",
+  "source": "llm",
+  "severity": 1,
+  "reason": "Driver explained the route change to the passenger, who agreed.",
+  "event_id": 1,
+  "event": {
+   "t": 26.0,
+   "trigger": "gps: left the planned route",
+   "groups": {
+    "loud_event": 0.99
+   },
+   "duration_s": 1.0,
+   "top_labels": {
+    "Bee, wasp, etc.": 0.98,
+    "Insect": 0.98,
+    "Speech": 0.91,
+    "Wild animals": 0.86,
+    "Animal": 0.8
+   },
+   "gps": {
+    "speed_kmh": 50.0,
+    "off_route_m": 351,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [],
+   "transcript": "hi the train station is probably just say you know there were so that they now so i'll take the side streets it's a small detail get oh okay no problem thanks for telling is it much longer this way"
+  },
+  "usage": {
+   "prompt_tokens": 661,
+   "completion_tokens": 29,
+   "total_tokens": 690,
+   "cost": 0.00020875,
+   "audio_tokens": 0
+  }
+ }
+]

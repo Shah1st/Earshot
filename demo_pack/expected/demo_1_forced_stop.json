@@ -1,0 +1,42 @@
+[
+ {
+  "t": 29.0,
+  "type": "decision",
+  "decision": "alert",
+  "source": "llm",
+  "severity": 3,
+  "reason": "Explicit demands to stop the car and get out indicate a serious safety threat.",
+  "event_id": 1,
+  "event": {
+   "t": 24.0,
+   "trigger": "sound",
+   "groups": {
+    "loud_event": 0.99
+   },
+   "duration_s": 0.5,
+   "top_labels": {
+    "Speech": 0.99,
+    "Vehicle": 0.13
+   },
+   "gps": {
+    "speed_kmh": 32.1,
+    "off_route_m": 3,
+    "sudden_stop": false,
+    "stopped_s": 0.0
+   },
+   "keywords": [
+    "get out of the car",
+    "stop the car",
+    "get out"
+   ],
+   "transcript": "evening to the old town please near the cathedral shit about ten minutes hey stop the can't stop the car now i said stop the car and get out get out of the car now okay okay please calm down i'm"
+  },
+  "usage": {
+   "prompt_tokens": 641,
+   "completion_tokens": 40,
+   "total_tokens": 681,
+   "cost": 0.00022025,
+   "audio_tokens": 0
+  }
+ }
+]
