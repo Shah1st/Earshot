@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace Earshot.Simulation
@@ -25,6 +26,7 @@ namespace Earshot.Simulation
         {
             public string atMarker;
             public string playAudio;
+            public string playReferenceRide;
             public Cue[] cues;
         }
         [Serializable] private sealed class Cue { public float atSeconds; public string action; }
@@ -35,6 +37,7 @@ namespace Earshot.Simulation
             public int PlannedIndex;
             public int AlternateIndex;
             public AudioClip Clip;
+            public byte[] ReferencePcm;
             public bool Fired;
         }
 
@@ -47,6 +50,8 @@ namespace Earshot.Simulation
         private List<PreparedEvent> events = new List<PreparedEvent>();
         private readonly List<ScheduledCue> scheduled = new List<ScheduledCue>();
         private readonly List<AudioSource> audioSources = new List<AudioSource>();
+        private readonly List<AudioClip> generatedClips = new List<AudioClip>();
+        private const double AudioScheduleLead = 0.08;
 
         private void Awake()
         {
@@ -109,16 +114,17 @@ namespace Earshot.Simulation
                 }
 
                 var prepared = PrepareEvents(scenario, planned, detour);
+                float approachSpeed = GetApproachSpeedLimit(prepared, planned, fork);
                 ClearTimeline();
                 scenarioIndex = index;
                 alternate = detour;
                 forkIndex = fork;
                 events = prepared;
-                driver.StartScenarioRoute(planned);
+                driver.StartScenarioRoute(planned, approachSpeed);
                 planner.SetPlannedRoute(planned);
                 Debug.Log($"Taxi scenario {index + 1}/{config.scenarios.Length}: {scenario.id}", this);
             }
-            catch (ArgumentException error)
+            catch (Exception error) when (error is ArgumentException || error is IOException || error is InvalidDataException)
             {
                 Debug.LogError($"Taxi scenario: {error.Message}", this);
             }
@@ -160,6 +166,14 @@ namespace Earshot.Simulation
                 int alternate = detour == null ? -1 : Array.IndexOf(scenario.drivingRoute, rideEvent.atMarker);
                 if (original < 0 && alternate < 0)
                     throw new ArgumentException($"Event marker '{rideEvent.atMarker}' is missing from both routes.");
+                byte[] referencePcm = null;
+                if (!string.IsNullOrEmpty(rideEvent.playReferenceRide))
+                {
+                    if (!string.IsNullOrEmpty(rideEvent.playAudio))
+                        throw new ArgumentException("Choose one audio source per event.");
+                    string path = Path.Combine(Application.streamingAssetsPath, "ReferenceRides", rideEvent.playReferenceRide + ".wav");
+                    referencePcm = ReferenceRide.ReadPcmWave(path);
+                }
                 foreach (Cue cue in rideEvent.cues ?? Array.Empty<Cue>())
                 {
                     if (cue == null || cue.atSeconds < 0f || float.IsNaN(cue.atSeconds) || float.IsInfinity(cue.atSeconds))
@@ -183,12 +197,36 @@ namespace Earshot.Simulation
                     Event = rideEvent,
                     PlannedIndex = original < 0 ? -1 : planned.StopWaypointIndices[original],
                     AlternateIndex = alternate < 0 ? -1 : detour.StopWaypointIndices[alternate],
-                    Clip = string.IsNullOrEmpty(rideEvent.playAudio) ? null : Resources.Load<AudioClip>("TaxiAudio/" + rideEvent.playAudio)
+                    Clip = string.IsNullOrEmpty(rideEvent.playAudio) ? null : Resources.Load<AudioClip>("TaxiAudio/" + rideEvent.playAudio),
+                    ReferencePcm = referencePcm
                 });
             }
             if (detour != null && !hasSwitch)
                 throw new ArgumentException("A drivingRoute requires a switch_route cue.");
             return prepared;
+        }
+
+        private static float GetApproachSpeedLimit(List<PreparedEvent> prepared, TaxiRoutePlanner.Route planned, int fork)
+        {
+            if (fork < 1)
+                return float.PositiveInfinity;
+
+            foreach (PreparedEvent entry in prepared)
+            {
+                if (entry.PlannedIndex != 0 || entry.ReferencePcm == null || entry.Event.cues == null)
+                    continue;
+                Cue turn = Array.Find(entry.Event.cues, cue => cue.action == "switch_route");
+                if (turn == null)
+                    continue;
+
+                float distanceToFork = 0f;
+                for (int i = 1; i <= fork; i++)
+                    distanceToFork += Vector3.Distance(planned.Waypoints[i - 1], planned.Waypoints[i]);
+                // Leave time to process the audio cue before the taxi reaches the last common waypoint.
+                float earliestForkTime = turn.atSeconds + (float)AudioScheduleLead + 0.25f;
+                return distanceToFork / earliestForkTime * 3.6f;
+            }
+            return float.PositiveInfinity;
         }
 
         private void OnWaypointReached(int index)
@@ -200,13 +238,21 @@ namespace Earshot.Simulation
                     continue;
                 entry.Fired = true;
                 double startTime = AudioSettings.dspTime;
-                if (entry.Clip != null)
+                AudioClip clip = entry.Clip;
+                if (entry.ReferencePcm != null)
                 {
-                    startTime += 0.08;
+                    float[] samples = ReferenceRide.PlaybackSamples(entry.ReferencePcm);
+                    clip = AudioClip.Create(entry.Event.playReferenceRide, samples.Length, 1, ReferenceRide.SampleRate, false);
+                    clip.SetData(samples, 0);
+                    generatedClips.Add(clip);
+                }
+                if (clip != null)
+                {
+                    startTime = AudioSettings.dspTime + AudioScheduleLead;
                     var source = gameObject.AddComponent<AudioSource>();
                     audioSources.Add(source);
                     source.playOnAwake = false;
-                    source.clip = entry.Clip;
+                    source.clip = clip;
                     source.PlayScheduled(startTime);
                 }
                 else if (!string.IsNullOrEmpty(entry.Event.playAudio))
@@ -257,6 +303,9 @@ namespace Earshot.Simulation
                 Destroy(source);
             }
             audioSources.Clear();
+            foreach (AudioClip clip in generatedClips)
+                Destroy(clip);
+            generatedClips.Clear();
         }
     }
 }

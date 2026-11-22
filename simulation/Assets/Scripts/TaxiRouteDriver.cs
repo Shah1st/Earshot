@@ -52,6 +52,7 @@ namespace Earshot.Simulation
         private readonly List<Vector3> drivenWaypoints = new List<Vector3>();
         private TaxiRoutePlanner.Route pendingDetour;
         private int detourWaypointIndex;
+        private float approachSpeedLimitKmh;
 
         private void OnEnable()
         {
@@ -106,10 +107,11 @@ namespace Earshot.Simulation
                 BeginRoute(newRoute);
         }
 
-        public void StartScenarioRoute(TaxiRoutePlanner.Route plannedRoute)
+        public void StartScenarioRoute(TaxiRoutePlanner.Route plannedRoute,
+            float speedLimitUntilDetourKmh = float.PositiveInfinity)
         {
             followRouteChanges = false;
-            BeginRoute(plannedRoute);
+            BeginRoute(plannedRoute, speedLimitUntilDetourKmh);
         }
 
         public void BrakeToStop() => IsHolding = true;
@@ -129,12 +131,13 @@ namespace Earshot.Simulation
             return true;
         }
 
-        private void BeginRoute(TaxiRoutePlanner.Route newRoute)
+        private void BeginRoute(TaxiRoutePlanner.Route newRoute, float speedLimitUntilDetourKmh = float.PositiveInfinity)
         {
             IsDriving = false;
             HasArrived = false;
             IsHolding = false;
             SpeedMetersPerSecond = 0f;
+            approachSpeedLimitKmh = speedLimitUntilDetourKmh;
             route = newRoute;
             NextWaypointIndex = 0;
             RideSequence++;
@@ -229,7 +232,8 @@ namespace Earshot.Simulation
             for (int i = NextWaypointIndex + 1; i < route.Waypoints.Count; i++)
                 remaining += Vector3.Distance(PositionAt(i - 1), PositionAt(i));
 
-            float desiredSpeed = IsHolding ? 0f : Mathf.Min(Mathf.Max(0.1f, speedKmh) / 3.6f,
+            float cruiseSpeed = Mathf.Min(speedKmh, approachSpeedLimitKmh);
+            float desiredSpeed = IsHolding ? 0f : Mathf.Min(Mathf.Max(0.1f, cruiseSpeed) / 3.6f,
                 Mathf.Sqrt(2f * Mathf.Max(0.1f, braking) * remaining));
             float oldSpeed = SpeedMetersPerSecond;
             float rate = desiredSpeed < oldSpeed ? braking : acceleration;
@@ -257,6 +261,7 @@ namespace Earshot.Simulation
                         RouteChangePosition = route.Waypoints[reached];
                         route = pendingDetour;
                         pendingDetour = null;
+                        approachSpeedLimitKmh = float.PositiveInfinity;
                     }
                     WaypointReached?.Invoke(reached);
                 }
