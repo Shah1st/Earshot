@@ -44,6 +44,23 @@
       "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_5_engine_stall", "cues": [
         { "atSeconds": 10.2, "action": "brake_to_stop" }
       ] }]
+    },
+    {
+      "id": "demo_6_abduction_rec",
+      "displayName": "Abduction",
+      "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
+      "drivingRoute": ["pickup", "first_block", "market", "fork_approach", "northwest", "north_cross", "destination"],
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_6_abduction_rec", "cues": [
+        { "atSeconds": 10.4, "action": "switch_route" }
+      ] }]
+    },
+    {
+      "id": "demo_7_knife_quiet_rec",
+      "displayName": "Quiet knife threat",
+      "plannedRoute": ["pickup", "first_block", "market", "fork_approach", "main_street", "destination"],
+      "events": [{ "atMarker": "pickup", "playReferenceRide": "demo_7_knife_quiet_rec", "cues": [
+        { "atSeconds": 15.5, "action": "brake_to_stop", "brakeSeconds": 1.3 }
+      ] }]
     }
   ]
 }

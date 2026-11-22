@@ -54,6 +54,7 @@ namespace Earshot.Simulation
         private TaxiRoutePlanner.Route pendingDetour;
         private int detourWaypointIndex;
         private float approachSpeedLimitKmh;
+        private float stoppingBrakeRate;
 
         private void OnEnable()
         {
@@ -115,7 +116,11 @@ namespace Earshot.Simulation
             BeginRoute(plannedRoute, speedLimitUntilDetourKmh);
         }
 
-        public void BrakeToStop() => IsHolding = true;
+        public void BrakeToStop(float seconds = 0f)
+        {
+            stoppingBrakeRate = seconds > 0f ? SpeedMetersPerSecond / seconds : braking;
+            IsHolding = true;
+        }
 
         public void ResumeDriving() => IsHolding = false;
 
@@ -237,7 +242,7 @@ namespace Earshot.Simulation
             float desiredSpeed = IsHolding ? 0f : Mathf.Min(Mathf.Max(0.1f, cruiseSpeed) / 3.6f,
                 Mathf.Sqrt(2f * Mathf.Max(0.1f, braking) * remaining));
             float oldSpeed = SpeedMetersPerSecond;
-            float rate = desiredSpeed < oldSpeed ? braking : acceleration;
+            float rate = desiredSpeed < oldSpeed ? (IsHolding ? stoppingBrakeRate : braking) : acceleration;
             SpeedMetersPerSecond = Mathf.MoveTowards(oldSpeed, desiredSpeed,
                 Mathf.Max(0.1f, rate) * deltaTime);
             float travel = (oldSpeed + SpeedMetersPerSecond) * 0.5f * deltaTime;
