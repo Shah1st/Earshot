@@ -1,0 +1,28 @@
+[
+ {
+  "a": 0,
+  "b": 30,
+  "decision": "alert",
+  "reason": "The passenger is being threatened with a knife and robbed.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 22,
+   "total_tokens": 889,
+   "cost": 0.00043725,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 25,
+  "b": 55,
+  "decision": "dismiss",
+  "reason": "The audio contains only the sound of a vehicle driving.",
+  "usage": {
+   "prompt_tokens": 267,
+   "completion_tokens": 22,
+   "total_tokens": 289,
+   "cost": 0.00013725,
+   "audio_tokens": 150
+  }
+ }
+]

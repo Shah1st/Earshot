@@ -1,0 +1,28 @@
+[
+ {
+  "a": 0,
+  "b": 30,
+  "decision": "alert",
+  "reason": "The passenger is shouting for help and demanding to be let out of the car.",
+  "usage": {
+   "prompt_tokens": 867,
+   "completion_tokens": 27,
+   "total_tokens": 894,
+   "cost": 0.00044475,
+   "audio_tokens": 750
+  }
+ },
+ {
+  "a": 25,
+  "b": 55,
+  "decision": "dismiss",
+  "reason": "The audio contains only ambient traffic noise.",
+  "usage": {
+   "prompt_tokens": 392,
+   "completion_tokens": 19,
+   "total_tokens": 411,
+   "cost": 0.00019525,
+   "audio_tokens": 275
+  }
+ }
+]
