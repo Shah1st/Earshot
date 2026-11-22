@@ -18,7 +18,8 @@ namespace Earshot.Simulation
             title ??= new GUIStyle(GUI.skin.label) { fontStyle = FontStyle.Bold, fontSize = 15 };
             message ??= new GUIStyle(GUI.skin.label) { wordWrap = true };
             float width = Mathf.Max(1, Mathf.Min(PanelWidth, Screen.width - 32));
-            GUILayout.BeginArea(new Rect(16, 16, width, Mathf.Max(1, Screen.height - 32)));
+            float left = Screen.width - width - 16;
+            GUILayout.BeginArea(new Rect(left, 16, width, Mathf.Max(1, Screen.height - 32)));
             GUILayout.BeginVertical(GUI.skin.box);
             GUILayout.Label(selected >= 0 ? DisplayName(scenarios[selected]) : "Choose a taxi scenario", title);
             if (!string.IsNullOrEmpty(status))

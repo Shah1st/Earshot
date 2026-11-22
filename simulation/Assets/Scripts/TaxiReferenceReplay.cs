@@ -171,9 +171,10 @@ namespace Earshot.Simulation
                 return;
 
             bool sideBySide = Screen.width >= 640;
-            int left = sideBySide ? TaxiScenarioMenu.PanelWidth + 48 : 26;
+            const int left = 26;
+            int right = sideBySide ? TaxiScenarioMenu.PanelWidth + 48 : 26;
             int top = sideBySide ? 48 : 154;
-            var frame = new Rect(left, top, Screen.width - left - 26, Screen.height - top - 26);
+            var frame = new Rect(left, top, Screen.width - left - right, Screen.height - top - 26);
             if (frame.width < 100 || frame.height < 40)
                 return;
             float scale = Mathf.Min(frame.width / mapBounds.width, frame.height / mapBounds.height);
