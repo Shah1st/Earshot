@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Sockets;
 using UnityEngine;
 
 namespace Earshot.Simulation
@@ -12,6 +14,7 @@ namespace Earshot.Simulation
     {
         [SerializeField] private TextAsset scenarioConfig;
         [SerializeField, Min(0)] private int scenarioIndex;
+        [SerializeField] private bool streamToAndroid;
 
         [Serializable] private sealed class Config { public Marker[] markers; public Scenario[] scenarios; }
         [Serializable] private sealed class Marker { public string id; public Vector3 position; }
@@ -45,6 +48,7 @@ namespace Earshot.Simulation
 
         private TaxiRoutePlanner planner;
         private TaxiRouteDriver driver;
+        private TaxiRouteNavigator navigator;
         private TaxiRoutePlanner.Route alternate;
         private int forkIndex;
         private List<PreparedEvent> events = new List<PreparedEvent>();
@@ -52,16 +56,40 @@ namespace Earshot.Simulation
         private readonly List<AudioSource> audioSources = new List<AudioSource>();
         private readonly List<AudioClip> generatedClips = new List<AudioClip>();
         private const double AudioScheduleLead = 0.08;
+        private TaxiReplayServer server;
+        private ReferenceRide streamRide;
+        private TaxiRoutePlanner.Route readyRoute;
+        private float readyApproachSpeed;
+        private double audioStart;
+        private string streamError;
+        private Config config;
+        private readonly TaxiScenarioMenu menu = new TaxiScenarioMenu();
+        private string[] scenarioIds = Array.Empty<string>();
+        private int selectedScenario = -1;
 
         private void Awake()
         {
             planner = GetComponent<TaxiRoutePlanner>();
             driver = GetComponent<TaxiRouteDriver>();
+            navigator = GetComponent<TaxiRouteNavigator>();
         }
 
         private void OnEnable() => driver.WaypointReached += OnWaypointReached;
 
-        private void Start() => StartSelectedScenario();
+        private void Start()
+        {
+            try
+            {
+                config = scenarioConfig != null ? JsonUtility.FromJson<Config>(scenarioConfig.text) : null;
+                if (config?.scenarios == null || config.scenarios.Length == 0 || config.markers == null)
+                    throw new ArgumentException("Assign a JSON config with markers and scenarios.");
+                scenarioIds = config.scenarios.Select(scenario => scenario?.id ?? "").ToArray();
+            }
+            catch (ArgumentException error)
+            {
+                streamError = error.Message;
+            }
+        }
 
         private void OnDisable()
         {
@@ -70,23 +98,21 @@ namespace Earshot.Simulation
         }
 
         [ContextMenu("Start / Restart Selected Scenario")]
-        public void StartSelectedScenario() => LoadScenario(false);
+        public void StartSelectedScenario() => LoadScenario(scenarioIndex);
 
         [ContextMenu("Next Scenario")]
-        public void NextScenario() => LoadScenario(true);
-
-        private void LoadScenario(bool next)
+        public void NextScenario()
         {
-            if (!Application.isPlaying || !isActiveAndEnabled)
+            if (scenarioIds.Length != 0)
+                LoadScenario((Mathf.Clamp(scenarioIndex, 0, scenarioIds.Length - 1) + 1) % scenarioIds.Length);
+        }
+
+        private void LoadScenario(int index)
+        {
+            if (!Application.isPlaying || !isActiveAndEnabled || scenarioIds.Length == 0)
                 return;
             try
             {
-                Config config = scenarioConfig != null ? JsonUtility.FromJson<Config>(scenarioConfig.text) : null;
-                if (config?.scenarios == null || config.scenarios.Length == 0 || config.markers == null)
-                    throw new ArgumentException("Assign a JSON config with markers and scenarios.");
-
-                int index = next ? (Mathf.Clamp(scenarioIndex, 0, config.scenarios.Length - 1) + 1) % config.scenarios.Length
-                    : scenarioIndex;
                 if (index < 0 || index >= config.scenarios.Length || config.scenarios[index] == null)
                     throw new ArgumentException($"Scenario index {index} is missing.");
 
@@ -116,18 +142,62 @@ namespace Earshot.Simulation
                 var prepared = PrepareEvents(scenario, planned, detour);
                 float approachSpeed = GetApproachSpeedLimit(prepared, planned, fork);
                 ClearTimeline();
+                streamError = null;
                 scenarioIndex = index;
                 alternate = detour;
                 forkIndex = fork;
                 events = prepared;
-                driver.StartScenarioRoute(planned, approachSpeed);
+                if (streamToAndroid)
+                {
+                    driver.StopRide();
+                    streamRide = PrepareStream(scenario.id, planned, prepared);
+                    server = new TaxiReplayServer(5005);
+                    readyRoute = planned;
+                    readyApproachSpeed = approachSpeed;
+                    Debug.Log($"Taxi city scene waiting for Android on 127.0.0.1:{server.Port}.", this);
+                }
+                else
+                {
+                    driver.StartScenarioRoute(planned, approachSpeed);
+                }
                 planner.SetPlannedRoute(planned);
+                selectedScenario = index;
                 Debug.Log($"Taxi scenario {index + 1}/{config.scenarios.Length}: {scenario.id}", this);
             }
-            catch (Exception error) when (error is ArgumentException || error is IOException || error is InvalidDataException)
+            catch (Exception error) when (error is ArgumentException || error is IOException
+                || error is InvalidDataException || error is SocketException)
             {
+                streamError = error.Message;
                 Debug.LogError($"Taxi scenario: {error.Message}", this);
             }
+        }
+
+        private ReferenceRide PrepareStream(string id, TaxiRoutePlanner.Route planned, List<PreparedEvent> prepared)
+        {
+            if (navigator == null)
+                throw new ArgumentException("Assign a TaxiRouteNavigator for Android GPS streaming.");
+            var audio = prepared.Where(entry => entry.ReferencePcm != null || entry.Clip != null).ToArray();
+            if (audio.Length != 1 || audio[0].PlannedIndex != 0 || audio[0].ReferencePcm == null)
+                throw new ArgumentException("Android streaming needs one reference WAV that starts at pickup.");
+
+            var route = planned.Waypoints.Select(position =>
+            {
+                TaxiGpsCoordinate point = navigator.ProjectGps(position);
+                return new ReplayCoordinate { lat = point.Latitude, lon = point.Longitude };
+            }).ToArray();
+            return new ReferenceRide(id, route, audio[0].ReferencePcm);
+        }
+
+        private ReplayGpsFix SampleGps(int tick)
+        {
+            TaxiGpsCoordinate point = navigator.ProjectGps(driver.WorldPosition);
+            return new ReplayGpsFix
+            {
+                t = tick * ReferenceRide.TickSeconds,
+                lat = point.Latitude,
+                lon = point.Longitude,
+                speed_kmh = driver.SpeedKmh
+            };
         }
 
         private TaxiRoutePlanner.Route BuildRoute(string[] ids, Dictionary<string, Vector3> markers, string field)
@@ -249,6 +319,8 @@ namespace Earshot.Simulation
                 if (clip != null)
                 {
                     startTime = AudioSettings.dspTime + AudioScheduleLead;
+                    if (server != null && entry.ReferencePcm != null)
+                        audioStart = startTime;
                     var source = gameObject.AddComponent<AudioSource>();
                     audioSources.Add(source);
                     source.playOnAwake = false;
@@ -277,6 +349,13 @@ namespace Earshot.Simulation
 
         private void Update()
         {
+            if (readyRoute != null && server?.Status == TaxiReplayServer.State.Connected)
+            {
+                driver.StartScenarioRoute(readyRoute, readyApproachSpeed);
+                readyRoute = null;
+                server.Begin(streamRide, SampleGps);
+            }
+
             double now = AudioSettings.dspTime;
             while (scheduled.Count > 0 && scheduled[0].Time <= now)
             {
@@ -294,8 +373,31 @@ namespace Earshot.Simulation
             }
         }
 
+        private void LateUpdate()
+        {
+            server?.Advance(AudioSettings.dspTime - audioStart);
+        }
+
+        private void OnGUI()
+        {
+            string status = (streamError ?? server?.Error) ?? (server?.Status switch
+            {
+                TaxiReplayServer.State.Waiting => "Waiting for Android on port 5005",
+                TaxiReplayServer.State.Connected => "Android connected",
+                TaxiReplayServer.State.Streaming => $"Android connected · {server.QueuedTicks} GPS/audio pairs",
+                TaxiReplayServer.State.Finished => $"Stream complete · {server.QueuedTicks} GPS/audio pairs",
+                _ => selectedScenario >= 0 && driver.HasArrived ? "Destination reached" : string.Empty
+            });
+            menu.Draw(gameObject.scene, scenarioIds, selectedScenario, status, LoadScenario);
+        }
+
         private void ClearTimeline()
         {
+            server?.Dispose();
+            server = null;
+            readyRoute = null;
+            streamRide = null;
+            selectedScenario = -1;
             scheduled.Clear();
             foreach (AudioSource source in audioSources)
             {

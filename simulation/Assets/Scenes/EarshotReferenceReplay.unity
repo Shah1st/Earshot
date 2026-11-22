@@ -219,7 +219,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8375c3c91fd544c6a9eec0ab99f2ec43, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  rideId: demo_2_roadworks
   port: 5005
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
