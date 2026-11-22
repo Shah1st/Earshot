@@ -3,16 +3,20 @@ package com.earshot.app
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.net.InetSocketAddress
 import java.net.Socket
+import java.util.concurrent.CopyOnWriteArrayList
 
 internal enum class RidePhase {
-    Ready, Loading, Connecting, Live, Complete, Disconnected, Error;
+    Ready, Loading, Connecting, Live, Comparing, Complete, Disconnected, Error;
 
-    val active: Boolean get() = this == Loading || this == Connecting || this == Live
+    val active: Boolean get() = this == Loading || this == Connecting || this == Live || this == Comparing
 }
 
 internal data class RideView(
@@ -28,12 +32,13 @@ internal data class RideView(
     val chunkSeconds: Double = 0.0,
     val transcript: String = "",
     val decisions: List<RideDecision> = emptyList(),
+    val baselineDecisions: List<RideDecision> = emptyList(),
 )
 
 internal class RideConnection : AutoCloseable {
     private val socket = Socket()
 
-    fun run(context: Context, update: (RideView) -> Unit) {
+    suspend fun run(context: Context, update: (RideView) -> Unit) {
         val config = context.assets.readJson("config.json")
         val sampleRate = config.getJSONObject("audio").getInt("sr")
         loadSpeechModel(context, config).use { model ->
@@ -50,13 +55,13 @@ internal class RideConnection : AutoCloseable {
         }
     }
 
-    private fun receive(
+    private suspend fun receive(
         stream: BufferedReader,
         config: JSONObject,
         sound: SoundModel,
         speech: SpeechStream,
         update: (RideView) -> Unit,
-    ) {
+    ) = coroutineScope {
         val audio = config.getJSONObject("audio")
         val rate = audio.getInt("sr")
         val tick = audio.getDouble("chunk_s")
@@ -69,13 +74,24 @@ internal class RideConnection : AutoCloseable {
         val planned = start.getJSONArray("route")
         require(ride.isNotBlank() && planned.length() >= 2) { "Missing ride ID or planned route" }
         val route = List(planned.length()) { coordinate(planned.getJSONArray(it)) }
-        val pipeline = RidePipeline(config, route, sound, speech, EventJudge())
+        val judge = EventJudge()
+        val pipeline = RidePipeline(config, route, sound, speech, judge)
+        val baseline = BaselineAudio(config.getJSONObject("baseline"), rate, bytesPerChunk)
+        val pending = Channel<AudioWindow>(capacity = 2)
+        val baselineResults = CopyOnWriteArrayList<RideDecision>()
+        val baselineWorker = launch {
+            for (window in pending) {
+                val decision = judge.evaluateAudio(window)
+                baselineResults += decision
+                Log.i(LOG, "$ride baseline t=${decision.time} ${decision.decision} tokens=${decision.tokens}")
+            }
+        }
         var ticks = 0
         var reported = 0
         var location: Coordinate? = null
 
-        fun snapshot(done: Boolean = false) = RideView(
-            phase = if (done) RidePhase.Complete else RidePhase.Live,
+        fun snapshot(phase: RidePhase = RidePhase.Live) = RideView(
+            phase = phase,
             rideId = ride,
             elapsed = ticks * tick,
             chunks = ticks,
@@ -86,6 +102,7 @@ internal class RideConnection : AutoCloseable {
             chunkSeconds = tick,
             transcript = speech.transcript(ticks * tick - 10, ticks * tick),
             decisions = pipeline.decisions.toList(),
+            baselineDecisions = baselineResults.toList(),
         )
 
         update(snapshot())
@@ -93,9 +110,13 @@ internal class RideConnection : AutoCloseable {
             val gps = stream.message()
             if (gps.getString("type") == "stop") {
                 require(gps.getString("ride_id") == ride) { "Stop message has the wrong ride ID" }
+                baseline.finish()?.let { pending.send(it) }
+                pending.close()
+                update(snapshot(RidePhase.Comparing))
+                baselineWorker.join()
                 Log.i(LOG, "$ride complete chunks=$ticks decisions=${pipeline.decisions.count { !it.summary }}")
-                update(snapshot(done = true))
-                return
+                update(snapshot(RidePhase.Complete))
+                return@coroutineScope
             }
             val time = ticks * tick
             require(gps.getString("type") == "gps" && gps.getDouble("t") == time) { "Unexpected GPS at $time s" }
@@ -108,6 +129,7 @@ internal class RideConnection : AutoCloseable {
             }
             val pcm = Base64.decode(frame.getString("pcm16_b64"), Base64.DEFAULT)
             require(pcm.size == bytesPerChunk) { "Invalid audio chunk size at $time s" }
+            baseline.add(pcm)?.let { pending.send(it) }
             pipeline.onGps(time, point, speed)
             pipeline.onAudio(time, pcm)
             location = point

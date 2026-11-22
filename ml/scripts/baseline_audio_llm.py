@@ -8,7 +8,6 @@ baseline: an incident counts as caught if ANY chunk that overlaps it says "alert
 from __future__ import annotations
 
 import argparse
-import base64
 import io
 import json
 from concurrent.futures import ThreadPoolExecutor
@@ -16,7 +15,8 @@ from concurrent.futures import ThreadPoolExecutor
 import soundfile as sf
 
 from earshot.common import RESULTS, SR, load_config
-from earshot.llm import chat, parse_json, spent_usd
+from earshot.judge import judge_audio
+from earshot.llm import spent_usd
 from earshot.rides import incidents, load_ride, scenario_paths
 
 CHUNK_S, HOP_S = 30, 25
@@ -29,16 +29,9 @@ PROMPT = ("You monitor the audio of a taxi ride for passenger and driver safety.
 
 
 def judge_chunk(base: dict, audio, a: float) -> dict:
-    model = base["model"]
     buf = io.BytesIO()
     sf.write(buf, audio[int(a * SR): int((a + CHUNK_S) * SR)], SR, format="WAV", subtype="PCM_16")
-    res = chat([{"role": "user", "content": [
-        {"type": "text", "text": base["prompt"]},
-        {"type": "input_audio", "input_audio": {"data": base64.b64encode(buf.getvalue()).decode(), "format": "wav"}}]}],
-        model=model, max_tokens=base["max_tokens"], tag="baseline_audio")
-    out = parse_json(res["text"])
-    return {"a": a, "b": a + CHUNK_S, "decision": out.get("decision", "check_in"), "reason": out.get("reason", ""),
-            "usage": res["usage"]}
+    return {"a": a, "b": a + CHUNK_S, **judge_audio(base, buf.getvalue())}
 
 
 def main() -> None:

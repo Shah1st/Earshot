@@ -12,6 +12,7 @@ internal data class RideDecision(
     val reason: String,
     val tokens: Int = 0,
     val summary: Boolean = false,
+    val backendUnavailable: Boolean = false,
 )
 
 internal class RidePipeline(
