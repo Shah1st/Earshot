@@ -10,6 +10,7 @@ namespace Earshot.Simulation
         public const int PanelWidth = 288;
         private GUIStyle title;
         private GUIStyle message;
+        private Vector2 scroll;
         private bool reloading;
         private string reloadError;
 
@@ -21,7 +22,7 @@ namespace Earshot.Simulation
             float left = Screen.width - width - 16;
             GUILayout.BeginArea(new Rect(left, 16, width, Mathf.Max(1, Screen.height - 32)));
             GUILayout.BeginVertical(GUI.skin.box);
-            GUILayout.Label(selected >= 0 ? DisplayName(scenarios[selected]) : "Choose a taxi scenario", title);
+            GUILayout.Label(selected >= 0 ? scenarios[selected] : "Choose a taxi scenario", title);
             if (!string.IsNullOrEmpty(status))
                 GUILayout.Label(status, message);
             if (!string.IsNullOrEmpty(reloadError))
@@ -29,13 +30,15 @@ namespace Earshot.Simulation
 
             bool previous = GUI.enabled;
             GUI.enabled = previous && !reloading;
-            if (selected < 0)
+            if (selected < 0 && scenarios.Count != 0)
             {
+                scroll = GUILayout.BeginScrollView(scroll, GUILayout.MaxHeight(Mathf.Max(36, Screen.height - 120)));
                 for (int i = 0; i < scenarios.Count; i++)
                 {
-                    if (GUILayout.Button(DisplayName(scenarios[i]), GUILayout.MinHeight(30)))
+                    if (GUILayout.Button(scenarios[i], GUILayout.MinHeight(30)))
                         select(i);
                 }
+                GUILayout.EndScrollView();
             }
             GUILayout.Space(4);
             if (GUILayout.Button(reloading ? "Reloading…" : "Reload scene", GUILayout.MinHeight(30)))
@@ -59,10 +62,12 @@ namespace Earshot.Simulation
             }
         }
 
-        private static string DisplayName(string id)
+        public static string DisplayName(string id, string label)
         {
-            string[] parts = id.Split(new[] { '_' }, 3);
-            string name = parts.Length == 3 && parts[0] == "demo" ? parts[2] : id;
+            if (!string.IsNullOrWhiteSpace(label))
+                return label;
+            string[] parts = (id ?? string.Empty).Split(new[] { '_' }, 3);
+            string name = parts.Length == 3 && parts[0] == "demo" ? parts[2] : id ?? string.Empty;
             name = name.Replace('_', ' ');
             if (name == "normal")
                 return "Normal ride";

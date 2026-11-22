@@ -20,6 +20,7 @@ namespace Earshot.Simulation
         private sealed class RideEntry
         {
             public string id = null;
+            public string displayName = null;
             public ReplayCoordinate[] route = null;
         }
 
@@ -40,7 +41,7 @@ namespace Earshot.Simulation
         private string startupError;
         private RideManifest manifest;
         private readonly TaxiScenarioMenu menu = new TaxiScenarioMenu();
-        private string[] scenarioIds = Array.Empty<string>();
+        private string[] scenarioNames = Array.Empty<string>();
         private int selectedRide = -1;
         private string folder;
 
@@ -60,7 +61,7 @@ namespace Earshot.Simulation
                     || manifest.samplesPerTick != ReferenceRide.SamplesPerTick
                     || manifest.rides.Any(entry => string.IsNullOrEmpty(entry?.id)))
                     throw new InvalidDataException("Invalid reference ride manifest.");
-                scenarioIds = manifest.rides.Select(entry => entry.id).ToArray();
+                scenarioNames = manifest.rides.Select(entry => TaxiScenarioMenu.DisplayName(entry.id, entry.displayName)).ToArray();
             }
             catch (Exception exception)
             {
@@ -165,7 +166,7 @@ namespace Earshot.Simulation
                 status += $"\n{(tick + 1) * ReferenceRide.TickSeconds:0.0} s · {fix.speed_kmh:0} km/h"
                     + $"\n{fix.lat:F5}, {fix.lon:F5}";
             }
-            menu.Draw(gameObject.scene, scenarioIds, selectedRide, status, LoadRide);
+            menu.Draw(gameObject.scene, scenarioNames, selectedRide, status, LoadRide);
 
             if (selectedRide < 0 || Event.current.type != EventType.Repaint)
                 return;

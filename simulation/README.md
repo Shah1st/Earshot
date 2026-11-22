@@ -28,6 +28,10 @@ driving and playing the selected WAV at pickup. Android receives the navigator's
 the taxi's live GPS position and speed, and the matching audio chunks until the WAV ends.
 Live GPS can produce different decisions from the reference replay.
 
+**Abduction** plays the 36-second team recording and queues a detour at 10.4 seconds.
+**Quiet knife threat** plays the 31-second team recording and starts a 1.3-second
+brake at 15.5 seconds.
+
 Clear **Stream To Android** on the taxi's **Taxi Scenario Runner** to drive the city
 without connecting. The `playReferenceRide` and
 `cues` fields in `Assets/Scenarios/TaxiScenarios.json` select the audio and time the movement cues.

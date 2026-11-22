@@ -21,6 +21,7 @@ namespace Earshot.Simulation
         [Serializable] private sealed class Scenario
         {
             public string id;
+            public string displayName;
             public string[] plannedRoute;
             public string[] drivingRoute;
             public RideEvent[] events;
@@ -32,7 +33,12 @@ namespace Earshot.Simulation
             public string playReferenceRide;
             public Cue[] cues;
         }
-        [Serializable] private sealed class Cue { public float atSeconds; public string action; }
+        [Serializable] private sealed class Cue
+        {
+            public float atSeconds;
+            public string action;
+            public float brakeSeconds;
+        }
 
         private sealed class PreparedEvent
         {
@@ -44,7 +50,7 @@ namespace Earshot.Simulation
             public bool Fired;
         }
 
-        private struct ScheduledCue { public double Time; public string Action; }
+        private struct ScheduledCue { public double Time; public Cue Cue; }
 
         private TaxiRoutePlanner planner;
         private TaxiRouteDriver driver;
@@ -64,7 +70,7 @@ namespace Earshot.Simulation
         private string streamError;
         private Config config;
         private readonly TaxiScenarioMenu menu = new TaxiScenarioMenu();
-        private string[] scenarioIds = Array.Empty<string>();
+        private string[] scenarioNames = Array.Empty<string>();
         private int selectedScenario = -1;
 
         private void Awake()
@@ -83,7 +89,8 @@ namespace Earshot.Simulation
                 config = scenarioConfig != null ? JsonUtility.FromJson<Config>(scenarioConfig.text) : null;
                 if (config?.scenarios == null || config.scenarios.Length == 0 || config.markers == null)
                     throw new ArgumentException("Assign a JSON config with markers and scenarios.");
-                scenarioIds = config.scenarios.Select(scenario => scenario?.id ?? "").ToArray();
+                scenarioNames = config.scenarios
+                    .Select(scenario => TaxiScenarioMenu.DisplayName(scenario?.id, scenario?.displayName)).ToArray();
             }
             catch (ArgumentException error)
             {
@@ -103,13 +110,13 @@ namespace Earshot.Simulation
         [ContextMenu("Next Scenario")]
         public void NextScenario()
         {
-            if (scenarioIds.Length != 0)
-                LoadScenario((Mathf.Clamp(scenarioIndex, 0, scenarioIds.Length - 1) + 1) % scenarioIds.Length);
+            if (scenarioNames.Length != 0)
+                LoadScenario((Mathf.Clamp(scenarioIndex, 0, scenarioNames.Length - 1) + 1) % scenarioNames.Length);
         }
 
         private void LoadScenario(int index)
         {
-            if (!Application.isPlaying || !isActiveAndEnabled || scenarioIds.Length == 0)
+            if (!Application.isPlaying || !isActiveAndEnabled || scenarioNames.Length == 0)
                 return;
             try
             {
@@ -251,6 +258,9 @@ namespace Earshot.Simulation
                     switch (cue.action)
                     {
                         case "brake_to_stop":
+                            if (cue.brakeSeconds < 0f || float.IsNaN(cue.brakeSeconds) || float.IsInfinity(cue.brakeSeconds))
+                                throw new ArgumentException("Brake duration must be finite and nonnegative.");
+                            break;
                         case "resume":
                             break;
                         case "switch_route":
@@ -331,7 +341,7 @@ namespace Earshot.Simulation
                     Debug.LogWarning($"Taxi scenario audio missing: Resources/TaxiAudio/{entry.Event.playAudio}. Timed cues will still run.", this);
 
                 foreach (Cue cue in entry.Event.cues ?? Array.Empty<Cue>())
-                    scheduled.Add(new ScheduledCue { Time = startTime + cue.atSeconds, Action = cue.action });
+                    scheduled.Add(new ScheduledCue { Time = startTime + cue.atSeconds, Cue = cue });
             }
             // Keep insertion order when actions share a timestamp.
             for (int i = 1; i < scheduled.Count; i++)
@@ -359,11 +369,11 @@ namespace Earshot.Simulation
             double now = AudioSettings.dspTime;
             while (scheduled.Count > 0 && scheduled[0].Time <= now)
             {
-                string action = scheduled[0].Action;
+                Cue cue = scheduled[0].Cue;
                 scheduled.RemoveAt(0);
-                switch (action)
+                switch (cue.action)
                 {
-                    case "brake_to_stop": driver.BrakeToStop(); break;
+                    case "brake_to_stop": driver.BrakeToStop(cue.brakeSeconds); break;
                     case "resume": driver.ResumeDriving(); break;
                     case "switch_route":
                         if (!driver.QueueDetour(alternate, forkIndex))
@@ -388,7 +398,7 @@ namespace Earshot.Simulation
                 TaxiReplayServer.State.Finished => $"Stream complete · {server.QueuedTicks} GPS/audio pairs",
                 _ => selectedScenario >= 0 && driver.HasArrived ? "Destination reached" : string.Empty
             });
-            menu.Draw(gameObject.scene, scenarioIds, selectedScenario, status, LoadScenario);
+            menu.Draw(gameObject.scene, scenarioNames, selectedScenario, status, LoadScenario);
         }
 
         private void ClearTimeline()
