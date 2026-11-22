@@ -7,6 +7,8 @@ Put one audio file per dialogue part in ml/data/recorded/ (wav, m4a, mp3, ogg...
     demo_3_shouting_detour_part1.*  demo_3_shouting_detour_part2.*
     demo_4_normal_part1.*        demo_4_normal_part2.*
     demo_5_engine_stall_part1.*  demo_5_engine_stall_part2.*  demo_5_engine_stall_part3.*
+    demo_6_abduction_part1.*     demo_6_abduction_part2.*        (extra scene, recordings only)
+    demo_7_knife_quiet_part1.*   demo_7_knife_quiet_part2.*      (extra scene, recordings only)
 
 The words are in scripts/make_demo.py (RIDES). Each recording is trimmed, level matched and, unless --dry,
 placed in the car with a measured impulse response; the ride then gets the same real driving noise and the
@@ -35,6 +37,30 @@ from earshot.common import CLIPS, DATA, REPO, SR, in_car, normalise, read_audio,
 from earshot.rides import load_ride  # noqa: E402
 
 IN, OUT, SCN = DATA / "recorded", DATA / "demo_recorded", REPO / "shared" / "scenarios" / "demo_recorded"
+
+# Two harder scenes that exist only as team recordings (never synthesised, not in the demo pack).
+EXTRA = {
+    "demo_6_abduction": {  # loud: passenger screams for help while the car leaves the route -> alert
+        "expect": "alert", "gps": [("detour", "p2.start", 2, {})], "end": ("p2.end", 12),
+        "parts": [
+            (2, [("P", "calm", "Hi. Lake street twelve, please."),
+                 ("D", "flat", "Okay.")]),
+            (3, [("P", "worried", "Excuse me, you missed the turn. This is not the way."),
+                 ("D", "cold", "Sit back. We are going somewhere else."),
+                 ("P", "LOUD: panicking, shouting", "What? No! Stop the car! Let me out! Let me out!"),
+                 ("D", "LOUD: shouting", "Be quiet!"),
+                 ("P", "LOUD: screaming", "Help! Somebody help me! Help!")])]},
+    "demo_7_knife_quiet": {  # quiet: nobody raises their voice; only the hard stop and the words give it away -> alert
+        "expect": "alert", "gps": [("sudden_stop", "p2.start", 6, {"dur": 60})], "end": ("p2.end", 8),
+        "parts": [
+            (2, [("P", "calm", "Evening. Just drive towards the station."),
+                 ("D", "friendly", "Sure, no problem.")]),
+            (3, [("P", "quiet, cold, close to the driver", "Don't turn around. I have a knife. Pull over here."),
+                 ("D", "frightened, quiet", "Okay. Okay. Please, don't hurt me."),
+                 ("P", "quiet, cold", "Give me the money and your phone. And don't press anything."),
+                 ("D", "shaking, quiet", "Take it. Take everything. Please, I have kids.")])]},
+}
+RIDES = {**RIDES, **EXTRA}
 
 
 def load_any(path: Path) -> np.ndarray:
