@@ -5,7 +5,7 @@ Everything needed to run the five demo rides without the Python environment. Gen
 
 | Path | For | What |
 |---|---|---|
-| `config.json` | app | thresholds, GPS limits, wordless sound rule, judge model and system prompt (version 13) |
+| `config.json` | app | thresholds, GPS limits, wordless sound rule, judge model and system prompt (version 14) |
 | `head.json` | app | sound head: 2,048 weights + bias |
 | `models/yamnet_tfhub.tflite` | app | float YAMNet; outputs 521 class scores and a 1,024 value embedding |
 | `models/yamnet_labels.txt` | app | class names, line i = class i |
@@ -20,9 +20,9 @@ Everything needed to run the five demo rides without the Python environment. Gen
 
 | Ride | Length | Earshot decides | Earshot tokens | Audio LLM says, per 30 s chunk | Audio LLM tokens |
 |---|---|---|---|---|---|
-| `demo_1_forced_stop` | 38 s | alert at 29.0 s | 681 | alert, alert | 1359 |
+| `demo_1_forced_stop` | 38 s | alert at 21.5 s | 635 | alert, alert | 1359 |
 | `demo_2_roadworks` | 46 s | dismiss at 31.0 s | 690 | dismiss, dismiss | 1557 |
-| `demo_3_shouting_detour` | 42 s | alert at 38.5 s | 703 | alert, dismiss | 1456 |
+| `demo_3_shouting_detour` | 42 s | alert at 24.0 s, alert at 38.5 s | 1394 | alert, dismiss | 1456 |
 | `demo_4_normal` | 33 s | nothing | 0 | dismiss, dismiss | 1231 |
 | `demo_5_engine_stall` | 57 s | dismiss at 53.5 s | 686 | check_in, dismiss, dismiss | 2102 |
 
